@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(docker-compose:*)",
+      "Bash(docker:*)",
+      "Bash(pytest:*)",
+      "Bash(python:*)",
+      "Bash(pip:*)",
+      "Bash(uv:*)",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(node:*)",
+      "Bash(ruff:*)",
+      "Bash(black:*)",
+      "Bash(mypy:*)",
+      "Bash(pre-commit:*)",
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(ls:*)",
+      "Bash(mkdir:*)",
+      "Bash(aws --endpoint-url=http://localhost:4566:*)",
+      "Bash(awslocal:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(git push --force:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(aws s3 rm:*)",
+      "Read(.env)",
+      "Read(**/.env)",
+      "Read(**/credentials*)",
+      "Read(**/*.pem)",
+      "Read(**/*secret*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'f=\"$CLAUDE_FILE_PATHS\"; case \"$f\" in *.py) command -v ruff >/dev/null && ruff format \"$f\" 2>/dev/null && ruff check --fix \"$f\" 2>/dev/null ;; *.ts|*.tsx|*.js|*.jsx) command -v npx >/dev/null && npx prettier --write \"$f\" 2>/dev/null ;; esac; exit 0'"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'Session done. Reminder: run pytest + update docs if architecture changed.'"
+          }
+        ]
+      }
+    ]
+  },
+  "env": {
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "MLFLOW_TRACKING_URI": "http://localhost:5000",
+    "AWS_ENDPOINT_URL": "http://localhost:4566",
+    "AWS_ACCESS_KEY_ID": "test",
+    "AWS_SECRET_ACCESS_KEY": "test",
+    "AWS_DEFAULT_REGION": "us-east-1"
+  }
+}

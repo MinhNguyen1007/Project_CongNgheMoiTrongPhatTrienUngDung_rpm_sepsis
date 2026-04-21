@@ -1,0 +1,52 @@
+@startuml activity-sepsis-detection
+' Mục 2.3 — Biểu đồ hoạt động
+' Luồng xử lý từ khi nhận sinh hiệu đến khi hiển thị cảnh báo
+
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam activity {
+  BackgroundColor #F0F7FF
+  BorderColor #1F5AA8
+  DiamondBackgroundColor #FFF9E8
+  DiamondBorderColor #C48A00
+}
+
+title Biểu đồ hoạt động — Luồng phát hiện và cảnh báo sepsis
+
+start
+
+:Nhận một quan sát sinh hiệu mới\n(HR, SpO2, Temp, SBP, MAP, Resp, ...);
+
+if (Dữ liệu hợp lệ?) then (có)
+  :Ghi vào S3 (Parquet historical);
+  :Cập nhật feature rolling\n(window 6h/12h/24h);
+
+  if (Đủ dữ liệu lịch sử (>= 6h)?) then (có)
+    :Gọi model inference\n(FastAPI → MLflow registry);
+    :Lưu xác suất dự đoán\nvào DynamoDB;
+
+    if (Xác suất ≥ ngưỡng?) then (≥ 0.5)
+      if (Trong 1h qua đã có alert\ncùng bệnh nhân?) then (có)
+        :Cập nhật alert hiện có\n(không tạo mới);
+      else (không)
+        :Tạo alert mới\n(ghi vào Postgres);
+        :Đẩy thông báo WebSocket\ncho dashboard;
+        :Gửi Slack webhook\n(nếu prob ≥ 0.7);
+      endif
+    else (< 0.5)
+      :Cập nhật biểu đồ xác suất\ntrên dashboard (bình thường);
+    endif
+
+  else (chưa đủ)
+    :Lưu chỉ số, chưa inference;
+    :Hiển thị trên dashboard\nở trạng thái "thu thập dữ liệu";
+  endif
+
+else (không hợp lệ)
+  :Ghi log outlier\n(vd: HR = 0, Temp = 50°C);
+  :Drop observation;
+endif
+
+stop
+
+@enduml

@@ -1,0 +1,41 @@
+name: Integration tests
+
+on:
+  pull_request:
+    branches: [main, dev]
+  workflow_dispatch:
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Start stack
+        run: docker compose up -d --wait --wait-timeout 180
+
+      - name: Wait for healthchecks
+        run: |
+          sleep 30
+          curl -sf http://localhost:4566/_localstack/health
+          curl -sf http://localhost:5000
+
+      - name: Init LocalStack
+        run: bash infra/localstack/init.sh
+
+      - name: Run integration tests
+        run: |
+          pip install pytest
+          pytest tests/integration/ -v -m integration
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose logs --tail=200
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

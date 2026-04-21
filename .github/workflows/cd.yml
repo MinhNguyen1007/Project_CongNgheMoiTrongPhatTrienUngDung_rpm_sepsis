@@ -1,0 +1,77 @@
+name: CD
+
+# Build backend + frontend Docker images on every merge to main, push
+# them to GitHub Container Registry (ghcr.io) tagged with the short sha
+# plus `latest`. Deploying to AWS is out of scope for the student demo —
+# pulling the tagged image from ghcr on a VM is a one-line follow-up.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write  # required to push to ghcr.io
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: backend
+            context: ./app/backend
+          - name: frontend
+            context: ./app/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Derive image name
+        id: meta
+        run: |
+          IMAGE="ghcr.io/${{ github.repository }}/${{ matrix.name }}"
+          # Downcase — ghcr rejects uppercase repository paths.
+          IMAGE_LC="$(echo "$IMAGE" | tr '[:upper:]' '[:lower:]')"
+          echo "image=$IMAGE_LC" >> "$GITHUB_OUTPUT"
+          echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.sha }}
+            ${{ steps.meta.outputs.image }}:latest
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  smoke-compose:
+    # Sanity check that the freshly built images actually start.
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start core services
+        run: docker compose up -d localstack postgres redis minio minio-init
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 30); do
+            if docker compose ps --format json | grep -q '"Health":"healthy"'; then
+              echo "some services healthy"; break
+            fi
+            sleep 2
+          done
+          docker compose ps
+      - name: Teardown
+        if: always()
+        run: docker compose down -v

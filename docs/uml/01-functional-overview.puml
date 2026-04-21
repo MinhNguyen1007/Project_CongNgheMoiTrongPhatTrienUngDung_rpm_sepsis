@@ -1,0 +1,67 @@
+@startuml functional-overview
+' Mục 2.1 — Sơ đồ chức năng tổng quát
+' Thể hiện 5 module chính của hệ thống và luồng dữ liệu giữa chúng
+
+!theme plain
+skinparam componentStyle rectangle
+skinparam backgroundColor #FFFFFF
+skinparam component {
+  BackgroundColor #F5F9FF
+  BorderColor #1F5AA8
+  FontSize 12
+}
+skinparam package {
+  BorderColor #888888
+  BackgroundColor #FAFAFA
+}
+skinparam arrow {
+  Color #333333
+  FontSize 10
+}
+
+title Sơ đồ chức năng tổng quát — Hệ thống giám sát sepsis
+
+package "1. Ingest (Thu nhận)" as ingest {
+  component "Data Simulator\n(PhysioNet replay)" as sim
+  component "Kinesis Stream\n(LocalStack)" as kinesis
+}
+
+package "2. Processing (Xử lý)" as proc {
+  component "Lambda Consumer\n(validate + transform)" as lambda
+  component "Feature Engineering\n(rolling stats, clinical scores)" as feat
+}
+
+package "3. Storage (Lưu trữ)" as store {
+  database "DynamoDB\n(realtime features)" as dynamo
+  database "S3 / Parquet\n(historical)" as s3
+  database "PostgreSQL\n(users, alerts, audit)" as pg
+}
+
+package "4. ML (Học máy)" as ml {
+  component "Inference Service\n(FastAPI)" as api
+  component "Model Registry\n(MLflow)" as mlflow
+  component "Drift Detection\n(Evidently)" as drift
+}
+
+package "5. Serving (Phục vụ)" as serve {
+  component "WebSocket\nBroadcaster" as ws
+  component "Dashboard\n(React)" as ui
+  component "Alert Manager\n(Slack webhook)" as alert
+}
+
+sim --> kinesis : events
+kinesis --> lambda : trigger
+lambda --> feat
+feat --> dynamo : update
+feat --> s3 : batch write
+feat --> api : POST /predict
+api --> mlflow : load model
+api --> dynamo : save prediction
+api --> ws : push update
+ws --> ui : WebSocket frame
+api --> alert : if prob > threshold
+ui --> pg : user actions (ack alert)
+drift --> s3 : read batch
+drift --> alert : if drift detected
+
+@enduml

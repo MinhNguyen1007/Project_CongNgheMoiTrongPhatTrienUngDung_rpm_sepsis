@@ -1,0 +1,71 @@
+@startuml usecase
+' Mục 2.2 — Biểu đồ Use Case
+' Actor và các chức năng chính
+
+!theme plain
+left to right direction
+skinparam backgroundColor #FFFFFF
+skinparam actor {
+  BackgroundColor #FFF9E8
+  BorderColor #C48A00
+}
+skinparam usecase {
+  BackgroundColor #F0F7FF
+  BorderColor #1F5AA8
+}
+skinparam rectangle {
+  BorderColor #444444
+}
+
+title Biểu đồ Use Case — Hệ thống giám sát sepsis
+
+actor "Bác sĩ ICU" as doctor
+actor "Điều dưỡng" as nurse
+actor "Quản trị viên" as admin
+actor "Hệ thống cảm biến\n(Simulator)" as sensor
+actor "Pipeline ML\n(nội bộ)" as mlpipe
+
+rectangle "Hệ thống giám sát bệnh nhân từ xa" {
+  usecase "UC01 — Đăng nhập" as UC01
+  usecase "UC02 — Xem danh sách\nbệnh nhân" as UC02
+  usecase "UC03 — Xem chi tiết\nbệnh nhân" as UC03
+  usecase "UC04 — Xem biểu đồ\nsinh hiệu thời gian thực" as UC04
+  usecase "UC05 — Nhận cảnh báo\nsepsis" as UC05
+  usecase "UC06 — Xác nhận cảnh báo" as UC06
+  usecase "UC07 — Ghi chú\nquyết định lâm sàng" as UC07
+  usecase "UC08 — Cấu hình ngưỡng\ncảnh báo" as UC08
+  usecase "UC09 — Quản lý\ntài khoản người dùng" as UC09
+  usecase "UC10 — Xem báo cáo\ntrôi mô hình" as UC10
+  usecase "UC11 — Gửi sinh hiệu\n(event streaming)" as UC11
+  usecase "UC12 — Suy luận\n(inference)" as UC12
+  usecase "UC13 — Huấn luyện lại\nmô hình" as UC13
+}
+
+doctor --> UC01
+doctor --> UC02
+doctor --> UC03
+doctor --> UC04
+doctor --> UC05
+doctor --> UC06
+doctor --> UC07
+
+nurse --> UC01
+nurse --> UC02
+nurse --> UC04
+nurse --> UC05
+
+admin --> UC01
+admin --> UC08
+admin --> UC09
+admin --> UC10
+admin --> UC13
+
+sensor --> UC11
+mlpipe --> UC12
+mlpipe --> UC13
+
+UC05 ..> UC12 : <<include>>
+UC06 ..> UC07 : <<extend>>
+UC03 ..> UC04 : <<include>>
+
+@enduml

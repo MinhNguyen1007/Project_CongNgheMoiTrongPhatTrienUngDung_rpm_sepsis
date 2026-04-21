@@ -1,0 +1,76 @@
+@startuml sequence-sepsis-detection
+' Mục 2.4 — Biểu đồ trình tự
+' Tình huống: phát hiện sepsis thành công, dashboard nhận cảnh báo
+
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam sequence {
+  ArrowColor #333333
+  LifeLineBackgroundColor #F0F7FF
+  LifeLineBorderColor #1F5AA8
+  ParticipantBackgroundColor #F5F9FF
+  ParticipantBorderColor #1F5AA8
+  ActorBackgroundColor #FFF9E8
+  ActorBorderColor #C48A00
+}
+
+title Biểu đồ trình tự — Phát hiện sepsis và đẩy cảnh báo real-time
+
+actor "Simulator\n(bệnh nhân P001)" as sim
+participant "Kinesis\n(LocalStack)" as kin
+participant "Lambda\nConsumer" as lam
+database "DynamoDB\n(feature store)" as dyn
+database "S3\n(Parquet)" as s3
+participant "FastAPI\nInference" as api
+participant "MLflow\nRegistry" as ml
+participant "WebSocket\nServer" as ws
+actor "Bác sĩ\n(browser)" as doc
+participant "Slack" as slack
+database "PostgreSQL\n(alerts)" as pg
+
+== Khởi tạo (một lần) ==
+
+api -> ml : load model\n(sepsis-lgbm-prod:Production)
+ml --> api : model artifact
+doc -> ws : WebSocket subscribe\n/ws/patients/P001
+
+== Chu kỳ mỗi giờ (streaming) ==
+
+sim -> kin : PutRecord\n{patient_id: P001, ts, vitals}
+kin -> lam : trigger (batch size 1)
+lam -> lam : validate schema\nrange check
+lam -> s3 : append Parquet row
+lam -> dyn : update rolling features\n(mean/std/slope 6h, 12h, 24h)
+lam -> api : POST /predict\n{patient_id, features}
+
+api -> api : build feature vector
+api -> ml : predict(vector)
+ml --> api : probability = 0.78
+api -> dyn : put Prediction\n{P001, ts, prob=0.78}
+
+alt prob >= 0.5 (cảnh báo)
+    api -> pg : query last alert (P001, 1h)
+    pg --> api : none
+    api -> pg : INSERT alert\n(P001, ts, prob=0.78)
+    pg --> api : alert_id=42
+
+    api -> ws : broadcast\n{event: "alert", prob: 0.78, ...}
+    ws -> doc : push WebSocket frame
+    doc -> doc : hiển thị cảnh báo đỏ
+
+    alt prob >= 0.7 (critical)
+        api -> slack : POST webhook\n"BN P001 prob 0.78"
+    end
+else prob < 0.5
+    api -> ws : broadcast\n{event: "update", prob: ...}
+    ws -> doc : push update (biểu đồ)
+end
+
+== Bác sĩ xác nhận ==
+
+doc -> api : POST /alerts/42/ack\n{note: "Đã khởi điều trị"}
+api -> pg : UPDATE alert SET\nacknowledged=true
+api -> ws : broadcast update
+ws -> doc : cảnh báo chuyển màu xanh
+
+@enduml

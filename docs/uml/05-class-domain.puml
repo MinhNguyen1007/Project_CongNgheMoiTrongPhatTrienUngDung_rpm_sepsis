@@ -1,0 +1,153 @@
+@startuml class-domain
+' Mục 2.5 — Biểu đồ lớp (domain model)
+' Các entity nghiệp vụ chính và quan hệ
+
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam class {
+  BackgroundColor #F5F9FF
+  BorderColor #1F5AA8
+  ArrowColor #333333
+}
+skinparam classAttributeIconSize 0
+
+title Biểu đồ lớp — Domain model
+
+package "Users & Auth" {
+  class User {
+    - id : int
+    - email : str
+    - hashed_password : str
+    - full_name : str
+    - role : Role
+    - is_active : bool
+    - created_at : datetime
+    --
+    + verify_password(raw: str) : bool
+    + is_admin() : bool
+  }
+
+  enum Role {
+    DOCTOR
+    NURSE
+    ADMIN
+  }
+}
+
+package "Patients & Clinical" {
+  class Patient {
+    - patient_id : str
+    - age : int
+    - gender : str
+    - admission_time : datetime
+    - icu_unit : str
+    - discharge_time : datetime?
+    --
+    + current_iculos() : int
+    + is_active() : bool
+  }
+
+  class VitalSign {
+    - patient_id : str
+    - timestamp : datetime
+    - hr : float?
+    - o2sat : float?
+    - temp : float?
+    - sbp : float?
+    - map : float?
+    - dbp : float?
+    - resp : float?
+    --
+    + has_all_core() : bool
+  }
+
+  class LabResult {
+    - patient_id : str
+    - timestamp : datetime
+    - name : str
+    - value : float
+    - unit : str
+  }
+}
+
+package "ML & Prediction" {
+  class ModelVersion {
+    - name : str
+    - version : int
+    - stage : str
+    - algorithm : str
+    - auroc : float
+    - utility_score : float
+    - trained_at : datetime
+    --
+    + promote(stage: str) : void
+  }
+
+  class Prediction {
+    - id : int
+    - patient_id : str
+    - timestamp : datetime
+    - probability : float
+    - model_version : str
+    - features : dict
+    --
+    + is_high_risk(threshold: float) : bool
+  }
+
+  class FeatureVector {
+    - patient_id : str
+    - timestamp : datetime
+    - values : dict<str, float>
+    - window_hours : int
+  }
+}
+
+package "Alerts & Audit" {
+  class Alert {
+    - id : int
+    - patient_id : str
+    - triggered_at : datetime
+    - probability : float
+    - severity : Severity
+    - acknowledged : bool
+    - acknowledged_by : int?
+    - acknowledged_at : datetime?
+    - note : str?
+    --
+    + acknowledge(user_id: int, note: str) : void
+    + is_critical() : bool
+  }
+
+  enum Severity {
+    WARNING
+    CRITICAL
+  }
+
+  class AuditLog {
+    - id : int
+    - user_id : int
+    - action : str
+    - entity : str
+    - entity_id : str
+    - timestamp : datetime
+    - payload : json
+  }
+}
+
+User }|--|| Role
+User "1" -- "*" Alert : acknowledges
+User "1" -- "*" AuditLog : performs
+
+Patient "1" *-- "*" VitalSign : has
+Patient "1" *-- "*" LabResult : has
+Patient "1" -- "*" Prediction : receives
+Patient "1" -- "*" Alert : triggers
+
+Prediction "1" -- "0..1" Alert : triggers
+Prediction "*" -- "1" ModelVersion : produced by
+VitalSign "*" -- "1" FeatureVector : aggregated into
+FeatureVector "1" -- "1" Prediction : input of
+
+Alert }|--|| Severity
+
+@enduml

@@ -1,0 +1,139 @@
+@startuml database-schema
+' Mục 2.6 — Database diagram
+' PostgreSQL (app DB) + DynamoDB (realtime) + S3 (historical Parquet)
+
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam class {
+  BackgroundColor #F5F9FF
+  BorderColor #1F5AA8
+}
+skinparam classAttributeIconSize 0
+
+title Database Schema — Hệ thống giám sát sepsis
+
+package "PostgreSQL (app DB)" as pg {
+
+  class users <<table>> {
+    **id** : SERIAL PK
+    email : VARCHAR(255) UNIQUE NOT NULL
+    hashed_password : VARCHAR(255) NOT NULL
+    full_name : VARCHAR(255)
+    role : VARCHAR(16) NOT NULL
+    is_active : BOOLEAN DEFAULT true
+    created_at : TIMESTAMPTZ DEFAULT now()
+  }
+
+  class patients <<table>> {
+    **patient_id** : VARCHAR(16) PK
+    age : SMALLINT
+    gender : CHAR(1)
+    admission_time : TIMESTAMPTZ
+    icu_unit : VARCHAR(32)
+    discharge_time : TIMESTAMPTZ NULL
+    created_at : TIMESTAMPTZ DEFAULT now()
+  }
+
+  class alerts <<table>> {
+    **id** : SERIAL PK
+    patient_id : VARCHAR(16) FK → patients
+    triggered_at : TIMESTAMPTZ NOT NULL
+    probability : REAL NOT NULL
+    severity : VARCHAR(16) NOT NULL
+    model_version : VARCHAR(32)
+    acknowledged : BOOLEAN DEFAULT false
+    acknowledged_by : INT NULL FK → users
+    acknowledged_at : TIMESTAMPTZ NULL
+    note : TEXT NULL
+    INDEX idx_patient_triggered (patient_id, triggered_at DESC)
+    INDEX idx_unack (acknowledged) WHERE acknowledged=false
+  }
+
+  class audit_log <<table>> {
+    **id** : SERIAL PK
+    user_id : INT FK → users
+    action : VARCHAR(64) NOT NULL
+    entity : VARCHAR(32)
+    entity_id : VARCHAR(32)
+    timestamp : TIMESTAMPTZ DEFAULT now()
+    payload : JSONB
+    INDEX idx_timestamp (timestamp DESC)
+  }
+
+  class alert_threshold_config <<table>> {
+    **id** : SERIAL PK
+    threshold_warning : REAL DEFAULT 0.5
+    threshold_critical : REAL DEFAULT 0.7
+    updated_by : INT FK → users
+    updated_at : TIMESTAMPTZ DEFAULT now()
+  }
+}
+
+package "DynamoDB (realtime feature store)" as dyn {
+
+  class patient_latest_features <<table>> {
+    **patient_id** : String (PK)
+    last_updated : String (ISO8601)
+    hr_mean_6h : Number
+    hr_std_6h : Number
+    spo2_min_6h : Number
+    temp_max_6h : Number
+    map_min_6h : Number
+    resp_max_6h : Number
+    qsofa_score : Number
+    sirs_count : Number
+    missing_flags : Map
+    iculos_hours : Number
+  }
+
+  class patient_recent_predictions <<table>> {
+    **patient_id** : String (PK)
+    **timestamp** : String (SK, ISO8601)
+    probability : Number
+    model_version : String
+    TTL : 48 hours
+  }
+}
+
+package "S3 (Historical Parquet)" as s3 {
+
+  class vitals_partitioned <<parquet>> {
+    Partition: s3://rpm/vitals/year=YYYY/month=MM/day=DD/
+    patient_id : string
+    timestamp : timestamp
+    hr, o2sat, temp, sbp, map, dbp, resp, etco2 : float
+    bun, creatinine, lactate, ... (26 lab cols) : float
+    iculos : int
+    sepsis_label : tinyint
+  }
+
+  class predictions_archive <<parquet>> {
+    Partition: s3://rpm/predictions/year=YYYY/month=MM/day=DD/
+    patient_id : string
+    timestamp : timestamp
+    probability : float
+    model_version : string
+    features_hash : string
+  }
+}
+
+users ||--o{ alerts : "acknowledged_by"
+users ||--o{ audit_log : "user_id"
+users ||--o{ alert_threshold_config : "updated_by"
+patients ||--o{ alerts : "patient_id"
+
+note bottom of dyn
+  **Tại sao dùng DynamoDB cho realtime?**
+  - Low-latency read (<10ms) cho inference path
+  - TTL tự động dọn prediction cũ
+  - Schema linh hoạt cho feature set thay đổi
+end note
+
+note bottom of s3
+  **Tại sao Parquet trên S3?**
+  - Columnar, nén tốt (~10x vs CSV)
+  - Partition theo ngày → query hiệu quả
+  - Nguồn duy nhất (source of truth) cho training
+end note
+
+@enduml

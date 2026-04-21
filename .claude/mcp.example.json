@@ -1,0 +1,32 @@
+{
+  "$comment": "Example MCP config. Copy sang .claude/mcp.json (không commit) và điền token/path thực.",
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "d:/S2_Year4/Emerging Technologies/Project"],
+      "$description": "MCP filesystem — cho phép Claude đọc/ghi trong thư mục project an toàn."
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_xxx_REPLACE_ME"
+      },
+      "$description": "MCP GitHub — list PR, issue, CI status trực tiếp. Cần PAT scope repo."
+    },
+    "postgres": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://user:pass@localhost:5432/rpm_db"
+      ],
+      "$description": "MCP Postgres — query DB app (users, alerts, audit_log) trực tiếp khi debug."
+    },
+    "sqlite": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sqlite", "--db-path", "./data/mlflow.db"],
+      "$description": "MCP SQLite — query MLflow tracking DB để list experiment offline."
+    }
+  }
+}

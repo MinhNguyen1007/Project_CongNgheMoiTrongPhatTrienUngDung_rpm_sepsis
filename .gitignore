@@ -1,0 +1,93 @@
+# ── Python ──────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# ── Node / Frontend ─────────────────────────────────────
+node_modules/
+dist/
+.vite/
+*.local
+.npm
+.eslintcache
+
+# ── Data (KHÔNG commit dataset) ─────────────────────────
+data/raw/
+data/processed/
+data/interim/
+data/features/
+data/features_relabeled/
+*.psv
+*.parquet
+*.csv
+*.rar
+*.zip
+!data/samples/*.csv            # cho phép sample nhỏ cho test
+!tests/**/*.csv
+!reports/load/baseline_stats.csv
+
+# ── ML artifacts ────────────────────────────────────────
+mlruns/
+mlartifacts/
+artifacts/
+*.pkl
+*.pt
+*.pth
+*.onnx
+*.h5
+
+# ── Docker / infra ──────────────────────────────────────
+.docker/
+volumes/
+localstack-data/
+
+# ── Secrets ─────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials*.json
+
+# ── Claude Code ─────────────────────────────────────────
+.claude/settings.local.json
+.claude/mcp.json
+.claude/memory/
+
+# ── IDE ─────────────────────────────────────────────────
+.vscode/*
+!.vscode/settings.json.example
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+
+# ── OS ──────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Report build artifacts ──────────────────────────────
+docs/report/*.pdf
+docs/report/*.aux
+docs/report/*.log
+docs/report/*.out
+docs/report/*.toc
+
+# ── Misc ────────────────────────────────────────────────
+.notes.md
+scratch/
+tmp/

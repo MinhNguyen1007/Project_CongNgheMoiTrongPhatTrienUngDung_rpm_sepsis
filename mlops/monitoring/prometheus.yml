@@ -1,0 +1,22 @@
+# Prometheus configuration for Sepsis Early-Warning monitoring stack
+# Scrapes metrics from FastAPI backend and MLflow
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "fastapi-backend"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:8000"]
+        labels:
+          service: backend
+          component: inference
+
+  # MLflow và Redis cần exporter riêng — chưa deploy, bỏ qua để target list gọn.
+  # Muốn bật lại: `redis_exporter` sidecar + bật prometheus exporter trong MLflow.

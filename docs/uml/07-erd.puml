@@ -1,0 +1,130 @@
+@startuml erd
+' Mục 2.7 — Biểu đồ thực thể - mối quan hệ (ERD)
+' Chuẩn hoá 3NF cho các entity nghiệp vụ chính
+
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam linetype ortho
+skinparam class {
+  BackgroundColor #F5F9FF
+  BorderColor #1F5AA8
+}
+skinparam classAttributeIconSize 0
+
+title Biểu đồ ERD — Thực thể và mối quan hệ
+
+entity "User" as user {
+  * user_id : int <<PK>>
+  --
+  email : varchar(255) <<UK>>
+  hashed_password : varchar(255)
+  full_name : varchar(255)
+  role : enum(DOCTOR, NURSE, ADMIN)
+  is_active : bool
+  created_at : timestamptz
+}
+
+entity "Patient" as patient {
+  * patient_id : varchar(16) <<PK>>
+  --
+  age : smallint
+  gender : char(1)
+  admission_time : timestamptz
+  icu_unit : varchar(32)
+  discharge_time : timestamptz
+}
+
+entity "VitalSign" as vital {
+  * vital_id : bigserial <<PK>>
+  --
+  # patient_id : varchar(16) <<FK>>
+  timestamp : timestamptz
+  hr : real
+  o2sat : real
+  temp : real
+  sbp : real
+  map_val : real
+  dbp : real
+  resp : real
+  etco2 : real
+}
+
+entity "LabResult" as lab {
+  * lab_id : bigserial <<PK>>
+  --
+  # patient_id : varchar(16) <<FK>>
+  timestamp : timestamptz
+  name : varchar(32)
+  value : real
+  unit : varchar(16)
+}
+
+entity "ModelVersion" as model {
+  * model_id : int <<PK>>
+  --
+  name : varchar(64)
+  version : int
+  stage : varchar(16)
+  algorithm : varchar(32)
+  auroc : real
+  utility_score : real
+  trained_at : timestamptz
+  UK (name, version)
+}
+
+entity "Prediction" as pred {
+  * prediction_id : bigserial <<PK>>
+  --
+  # patient_id : varchar(16) <<FK>>
+  # model_id : int <<FK>>
+  timestamp : timestamptz
+  probability : real
+  features_hash : varchar(64)
+}
+
+entity "Alert" as alert {
+  * alert_id : serial <<PK>>
+  --
+  # patient_id : varchar(16) <<FK>>
+  # prediction_id : bigint <<FK>>
+  # acknowledged_by : int <<FK, null>>
+  triggered_at : timestamptz
+  probability : real
+  severity : enum(WARNING, CRITICAL)
+  acknowledged : bool
+  acknowledged_at : timestamptz
+  note : text
+}
+
+entity "AuditLog" as audit {
+  * audit_id : bigserial <<PK>>
+  --
+  # user_id : int <<FK>>
+  action : varchar(64)
+  entity : varchar(32)
+  entity_id : varchar(32)
+  timestamp : timestamptz
+  payload : jsonb
+}
+
+entity "ThresholdConfig" as cfg {
+  * config_id : serial <<PK>>
+  --
+  # updated_by : int <<FK>>
+  threshold_warning : real
+  threshold_critical : real
+  updated_at : timestamptz
+}
+
+' Relationships
+patient ||--o{ vital : "records"
+patient ||--o{ lab : "has"
+patient ||--o{ pred : "receives"
+patient ||--o{ alert : "triggers"
+model ||--o{ pred : "produces"
+pred ||--o| alert : "leads to"
+user ||--o{ alert : "acknowledges"
+user ||--o{ audit : "performs"
+user ||--o{ cfg : "updates"
+
+@enduml

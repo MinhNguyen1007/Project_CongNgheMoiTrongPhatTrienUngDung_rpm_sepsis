@@ -1,0 +1,58 @@
+[project]
+name = "remote-patient-monitoring"
+version = "0.1.0"
+description = "Remote patient monitoring with streaming + MLOps — sepsis early warning"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [".venv", "build", "dist", "data"]
+
+[tool.ruff.lint]
+select = [
+  "E", "F", "W",      # pycodestyle + pyflakes
+  "I",                # isort
+  "N",                # pep8-naming
+  "UP",               # pyupgrade
+  "B",                # bugbear
+  "A",                # builtins shadow
+  "C4",               # comprehensions
+  "SIM",              # simplify
+  "RUF",              # ruff-specific
+]
+ignore = [
+  "E501",             # line too long (black/ruff-format handles)
+  "N806",             # uppercase var (ML often uses X, y)
+  "N803",             # lowercase arg (ML often uses X, y)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]                # allow assert in tests
+"ml/notebooks/**" = ["E402", "F401"] # notebook conventions
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+no_strict_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = false
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-v --strict-markers --tb=short"
+markers = [
+  "slow: marks tests as slow",
+  "integration: integration tests needing docker-compose",
+  "gpu: requires GPU",
+]
+
+[tool.bandit]
+exclude_dirs = ["tests", "ml/notebooks"]
+skips = ["B101"]   # allow assert

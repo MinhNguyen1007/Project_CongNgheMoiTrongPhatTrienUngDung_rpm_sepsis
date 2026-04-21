@@ -1,0 +1,83 @@
+name: Drift Monitoring
+
+# Run weekly (Monday 02:00 UTC) or manually from the Actions tab.
+# Reference + current parquet chunks are pulled from the MinIO / S3
+# bucket; credentials + endpoint must be provided as repo secrets.
+#
+# Required secrets (optional — job skips gracefully if any is missing):
+#   AWS_ENDPOINT_URL       — e.g. https://minio.example.com
+#   AWS_ACCESS_KEY_ID
+#   AWS_SECRET_ACCESS_KEY
+#   DRIFT_REFERENCE_S3     — s3://bucket/path/train.parquet
+#   DRIFT_CURRENT_S3       — s3://bucket/path/recent.parquet
+#   SLACK_WEBHOOK_URL      — posted to when drift share >= threshold
+on:
+  schedule:
+    - cron: "0 2 * * 1"
+  workflow_dispatch:
+    inputs:
+      share_threshold:
+        description: "Share of drifted columns to notify Slack"
+        required: false
+        default: "0.3"
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install deps
+        run: |
+          pip install -r ml/requirements.txt
+      - name: Check required secrets
+        id: gate
+        env:
+          REF_URI: ${{ secrets.DRIFT_REFERENCE_S3 }}
+          CUR_URI: ${{ secrets.DRIFT_CURRENT_S3 }}
+        run: |
+          if [ -z "$REF_URI" ] || [ -z "$CUR_URI" ]; then
+            echo "Drift secrets not configured — skipping." >&2
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Download parquet from S3
+        if: steps.gate.outputs.skip == 'false'
+        env:
+          AWS_ENDPOINT_URL: ${{ secrets.AWS_ENDPOINT_URL }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+          REF_URI: ${{ secrets.DRIFT_REFERENCE_S3 }}
+          CUR_URI: ${{ secrets.DRIFT_CURRENT_S3 }}
+        run: |
+          mkdir -p data/processed
+          pip install awscli
+          AWS_FLAGS=""
+          if [ -n "$AWS_ENDPOINT_URL" ]; then
+            AWS_FLAGS="--endpoint-url $AWS_ENDPOINT_URL"
+          fi
+          aws s3 cp "$REF_URI" data/processed/train.parquet $AWS_FLAGS
+          aws s3 cp "$CUR_URI" data/processed/val.parquet   $AWS_FLAGS
+      - name: Run drift check
+        if: steps.gate.outputs.skip == 'false'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          python mlops/drift/check.py \
+            --reference data/processed/train.parquet \
+            --current   data/processed/val.parquet \
+            --sample 10000 \
+            --share-threshold "${{ github.event.inputs.share_threshold || '0.3' }}"
+      - name: Upload drift report
+        if: steps.gate.outputs.skip == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift-report
+          path: mlops/drift/reports/*.html
+          if-no-files-found: warn
+          retention-days: 30
