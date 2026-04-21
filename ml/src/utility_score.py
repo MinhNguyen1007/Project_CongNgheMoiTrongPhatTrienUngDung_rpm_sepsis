@@ -10,14 +10,14 @@ import numpy as np
 import pandas as pd
 
 # ── Utility function parameters (from challenge spec) ──
-DT_EARLY = -12   # earliest useful prediction (hours before onset)
+DT_EARLY = -12  # earliest useful prediction (hours before onset)
 DT_OPTIMAL = -6  # start of max-reward window
-DT_LATE = 3      # latest useful prediction (hours after onset)
+DT_LATE = 3  # latest useful prediction (hours after onset)
 
-U_TP_MAX = 1.0   # max reward for correct early prediction
-U_FN = -2.0      # penalty for missing sepsis
-U_FP = -0.05     # penalty for false alarm on non-sepsis patient
-U_TN = 0.0       # no penalty for correct rejection
+U_TP_MAX = 1.0  # max reward for correct early prediction
+U_FN = -2.0  # penalty for missing sepsis
+U_FP = -0.05  # penalty for false alarm on non-sepsis patient
+U_TN = 0.0  # no penalty for correct rejection
 
 
 def _utility_tp(dt: int) -> float:
@@ -39,9 +39,7 @@ def _utility_tp(dt: int) -> float:
         return U_FN
 
 
-def _first_consecutive_alarm(
-    preds: np.ndarray, k: int, warmup: int = 0
-) -> int | None:
+def _first_consecutive_alarm(preds: np.ndarray, k: int, warmup: int = 0) -> int | None:
     """Return index of first run of `k` consecutive 1s, or None.
 
     Implements the hysteresis rule (decision #6): alarm only fires after
@@ -88,9 +86,7 @@ def compute_patient_utility(
         Utility score for this patient.
     """
     is_sepsis = np.any(labels == 1)
-    t_alarm = _first_consecutive_alarm(
-        predictions.astype(int), min_consecutive, warmup_hours
-    )
+    t_alarm = _first_consecutive_alarm(predictions.astype(int), min_consecutive, warmup_hours)
     has_alarm = t_alarm is not None
 
     if is_sepsis:
@@ -124,21 +120,20 @@ def compute_normalized_utility(
     max_utility = 0.0
     counts = {"tp": 0, "fn": 0, "fp": 0, "tn": 0}
 
-    for pid, group in df.groupby(patient_col):
+    for _pid, group in df.groupby(patient_col):
         preds = group[pred_col].values.astype(int)
         labels = group[label_col].values.astype(int)
 
         u = compute_patient_utility(
-            preds, labels,
+            preds,
+            labels,
             min_consecutive=min_consecutive,
             warmup_hours=warmup_hours,
         )
         raw_utility += u
 
         is_sepsis = np.any(labels == 1)
-        has_alarm = _first_consecutive_alarm(
-            preds, min_consecutive, warmup_hours
-        ) is not None
+        has_alarm = _first_consecutive_alarm(preds, min_consecutive, warmup_hours) is not None
 
         if is_sepsis:
             # Best possible: predict at optimal time

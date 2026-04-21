@@ -60,7 +60,10 @@ interface VitalPoint {
   probability?: number;
 }
 
-export function PatientVitalChart({ patientId, hoursBack = 24 }: PatientVitalChartProps) {
+export function PatientVitalChart({
+  patientId,
+  hoursBack = 24,
+}: PatientVitalChartProps) {
   const [history, setHistory] = useState<VitalPoint[]>([]);
   const { lastMessage } = useWebSocket(`/ws/patients/${patientId}`);
 
@@ -71,11 +74,13 @@ export function PatientVitalChart({ patientId, hoursBack = 24 }: PatientVitalCha
   }, [patientId, hoursBack]);
 
   useEffect(() => {
-    if (lastMessage) setHistory((prev) => [...prev, lastMessage as VitalPoint].slice(-500));
+    if (lastMessage)
+      setHistory((prev) => [...prev, lastMessage as VitalPoint].slice(-500));
   }, [lastMessage]);
 
   const latestProb = history.at(-1)?.probability ?? 0;
-  const alertLevel = latestProb > 0.7 ? "critical" : latestProb > 0.5 ? "warning" : "ok";
+  const alertLevel =
+    latestProb > 0.7 ? "critical" : latestProb > 0.5 ? "warning" : "ok";
 
   return (
     <div className="rounded-lg border bg-white p-4 shadow-sm">

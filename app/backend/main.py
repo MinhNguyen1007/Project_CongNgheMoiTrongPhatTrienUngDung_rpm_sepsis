@@ -21,17 +21,16 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import redis.asyncio as redis
 from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select, desc
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .auth import (
     create_access_token,
-    get_current_user,
     hash_password,
     require_auth,
     require_role,
@@ -39,7 +38,8 @@ from .auth import (
 )
 from .config import Settings, get_settings
 from .database import create_tables, get_db
-from .db_models import Alert as AlertModel, User
+from .db_models import Alert as AlertModel
+from .db_models import User
 from .decision import (
     append_proba,
     decide,
@@ -51,7 +51,6 @@ from .decision import (
 )
 from .model import ModelBundle, load_bundle, predict_proba
 from .schemas import (
-    AcknowledgeRequest,
     AlertEvent,
     AlertResponse,
     HealthResponse,
@@ -68,9 +67,7 @@ from .schemas import (
 )
 from .ws_manager import manager
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -90,6 +87,7 @@ async def lifespan(app: FastAPI):
     # Seed default admin user if none exists
     try:
         from .database import async_session
+
         async with async_session() as db:
             result = await db.execute(select(User).where(User.username == "admin"))
             if result.scalar_one_or_none() is None:
@@ -177,7 +175,7 @@ async def predict(
         min_consecutive=bundle.min_consecutive,
         warmup_hours=bundle.warmup_hours,
     )
-    ts = datetime.now(timezone.utc)
+    ts = datetime.now(UTC)
     await record_prediction(r, req.patient_id, ts.isoformat(), decision)
     await store_patient_meta(r, req.patient_id, req.iculos_hours)
 
@@ -193,6 +191,7 @@ async def predict(
         # Persist alarm to PostgreSQL
         try:
             from .database import async_session
+
             async with async_session() as db:
                 alert = AlertModel(
                     patient_id=req.patient_id,
@@ -427,7 +426,7 @@ async def acknowledge_alert(
 
     alert.acknowledged = True
     alert.acknowledged_by = user.username
-    alert.acknowledged_at = datetime.now(timezone.utc)
+    alert.acknowledged_at = datetime.now(UTC)
     await db.commit()
     await db.refresh(alert)
     return AlertResponse(

@@ -33,7 +33,11 @@ export function AppLayout() {
 
   const wsTone =
     status === "open" ? "ok" : status === "connecting" ? "warn" : "critical";
-  const apiTone = health.isSuccess ? "ok" : health.isError ? "critical" : "warn";
+  const apiTone = health.isSuccess
+    ? "ok"
+    : health.isError
+      ? "critical"
+      : "warn";
 
   return (
     <div className="min-h-full">

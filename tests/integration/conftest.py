@@ -8,11 +8,10 @@ from __future__ import annotations
 
 import os
 import secrets
-from typing import Generator
+from collections.abc import Generator
 
 import httpx
 import pytest
-
 
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
 ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
@@ -53,7 +52,12 @@ def ephemeral_user(
     """Create a throwaway user, yield credentials + id, clean up after test."""
     uname = f"itest_{secrets.token_hex(4)}"
     pwd = "integration-pass-123"
-    payload = {"username": uname, "password": pwd, "full_name": "Integration Test", "role": "viewer"}
+    payload = {
+        "username": uname,
+        "password": pwd,
+        "full_name": "Integration Test",
+        "role": "viewer",
+    }
     r = httpx.post(f"{backend_up}/auth/register", json=payload, headers=admin_headers, timeout=5.0)
     r.raise_for_status()
     user = r.json()

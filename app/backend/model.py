@@ -96,7 +96,11 @@ def load_bundle() -> ModelBundle:
 
     logger.info(
         "Loaded model: %d features, thr=%.3f k=%d warmup=%dh (run=%s)",
-        len(feature_cols), threshold, min_consecutive, warmup_hours, run_id,
+        len(feature_cols),
+        threshold,
+        min_consecutive,
+        warmup_hours,
+        run_id,
     )
     return ModelBundle(
         model=model,
@@ -110,8 +114,6 @@ def load_bundle() -> ModelBundle:
 
 def predict_proba(bundle: ModelBundle, features: dict[str, float]) -> float:
     row = {c: features.get(c, np.nan) for c in bundle.feature_cols}
-    df = pd.DataFrame([row], columns=bundle.feature_cols).apply(
-        pd.to_numeric, errors="coerce"
-    )
+    df = pd.DataFrame([row], columns=bundle.feature_cols).apply(pd.to_numeric, errors="coerce")
     proba = bundle.model.predict(df)
     return float(np.asarray(proba).ravel()[0])

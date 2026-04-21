@@ -56,11 +56,7 @@ def decide(
             break
 
     warmup_muted = iculos_hours < warmup_hours
-    alarm = (
-        not warmup_muted
-        and streak >= min_consecutive
-        and len(history) >= min_consecutive
-    )
+    alarm = not warmup_muted and streak >= min_consecutive and len(history) >= min_consecutive
     return AlarmDecision(
         alarm=alarm,
         proba=proba,
@@ -78,12 +74,14 @@ async def record_prediction(
 ) -> None:
     """Append decision to patient's prediction log (last 24 entries)."""
     key = f"patient:{patient_id}:predictions"
-    entry = json.dumps({
-        "timestamp": timestamp,
-        "proba": decision.proba,
-        "alarm": decision.alarm,
-        "streak": decision.consecutive_above,
-    })
+    entry = json.dumps(
+        {
+            "timestamp": timestamp,
+            "proba": decision.proba,
+            "alarm": decision.alarm,
+            "streak": decision.consecutive_above,
+        }
+    )
     pipe = r.pipeline()
     pipe.rpush(key, entry)
     pipe.ltrim(key, -24, -1)
@@ -97,10 +95,13 @@ async def store_patient_meta(
 ) -> None:
     """Update lightweight patient metadata in a Redis hash."""
     key = META_KEY.format(pid=patient_id)
-    await r.hset(key, mapping={
-        "patient_id": patient_id,
-        "iculos_hours": str(iculos_hours),
-    })
+    await r.hset(
+        key,
+        mapping={
+            "patient_id": patient_id,
+            "iculos_hours": str(iculos_hours),
+        },
+    )
 
 
 async def get_active_patients(r: redis.Redis) -> list[dict]:
@@ -132,13 +133,15 @@ async def get_active_patients(r: redis.Redis) -> list[dict]:
             if meta:
                 iculos_hours = int(float(meta.get("iculos_hours", "0")))
 
-            patients.append({
-                "patient_id": pid,
-                "latest_proba": latest_proba,
-                "latest_alarm": latest_alarm,
-                "last_update": last_update,
-                "iculos_hours": iculos_hours,
-            })
+            patients.append(
+                {
+                    "patient_id": pid,
+                    "latest_proba": latest_proba,
+                    "latest_alarm": latest_alarm,
+                    "last_update": last_update,
+                    "iculos_hours": iculos_hours,
+                }
+            )
 
         if cursor == 0:
             break
@@ -154,17 +157,21 @@ async def get_proba_history(r: redis.Redis, patient_id: str) -> list[dict]:
     result: list[dict] = []
     for raw in preds_raw:
         entry = json.loads(raw)
-        result.append({
-            "timestamp": entry.get("timestamp", ""),
-            "proba": float(entry.get("proba", 0.0)),
-            "alarm": entry.get("alarm", False),
-            "streak": int(entry.get("streak", 0)),
-        })
+        result.append(
+            {
+                "timestamp": entry.get("timestamp", ""),
+                "proba": float(entry.get("proba", 0.0)),
+                "alarm": entry.get("alarm", False),
+                "streak": int(entry.get("streak", 0)),
+            }
+        )
     return result
 
 
 async def get_vitals_history(
-    r: redis.Redis, patient_id: str, hours: int = 72,
+    r: redis.Redis,
+    patient_id: str,
+    hours: int = 72,
 ) -> list[dict]:
     """Return stored vitals for a patient (up to `hours` entries)."""
     key = f"patient:{patient_id}:vitals"

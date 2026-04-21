@@ -12,7 +12,7 @@ import pytest
 
 pytest.importorskip("redis")
 
-from app.backend.decision import decide  # noqa: E402
+from app.backend.decision import decide
 
 
 def test_no_alarm_below_threshold():

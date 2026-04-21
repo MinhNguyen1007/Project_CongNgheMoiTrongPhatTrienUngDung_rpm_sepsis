@@ -16,11 +16,12 @@ Delegate review lâm sàng cho subagent `medical-reviewer` trên file/module `$A
    - Nếu trống → hỏi user chỉ định hoặc mặc định review `ml/src/features.py` + `app/backend/src/services/ml_inference.py` + `app/backend/src/services/alerts.py`.
 2. Spawn `medical-reviewer` agent với prompt:
    > "Review clinical validity của [files]. Đặc biệt check:
+   >
    > - Data leak (feature dùng giá trị tương lai).
    > - Threshold alert hợp lý với sepsis.
    > - Missing handling an toàn (không fill 0 cho vital signs).
    > - Clinical scores (qSOFA/SIRS/SOFA) đúng công thức.
-   > Format output theo checklist trong agent config."
+   >   Format output theo checklist trong agent config."
 3. Nhận kết quả, tổng hợp, suggest fix cho user theo priority BLOCKER > WARNING > INFO.
 4. Nếu có BLOCKER, không đề xuất merge PR — gợi ý fix trước.
 

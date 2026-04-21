@@ -26,11 +26,17 @@ ignore = [
   "E501",             # line too long (black/ruff-format handles)
   "N806",             # uppercase var (ML often uses X, y)
   "N803",             # lowercase arg (ML often uses X, y)
+  "B008",             # function-call-in-default-argument — FastAPI Depends() pattern
+  "RUF001", "RUF002", "RUF003",  # ambiguous unicode (× – etc.) — keep for readability
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]                # allow assert in tests
 "ml/notebooks/**" = ["E402", "F401"] # notebook conventions
+"ml/src/train_lgbm.py" = ["E402"]    # MinIO env must be set before sklearn/boto3 import
+"ml/src/evaluate.py"   = ["E402"]
+"ml/src/ensemble.py"   = ["E402"]
+"data-pipeline/**" = ["N999"]        # module name 'data-pipeline' with hyphen is intentional
 
 [tool.ruff.format]
 quote-style = "double"

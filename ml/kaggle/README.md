@@ -37,6 +37,7 @@ Thời gian chạy ước tính: 15–30 phút (tùy số iterations hội tụ)
 ### 4. Download artifacts
 
 Từ `/kaggle/working/` download về máy local:
+
 - `catboost_model.cbm`
 - `val_proba.parquet`
 - `test_proba.parquet`

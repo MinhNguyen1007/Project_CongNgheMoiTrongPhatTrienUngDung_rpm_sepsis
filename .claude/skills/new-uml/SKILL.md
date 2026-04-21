@@ -19,6 +19,7 @@ Tạo file PlantUML (`.puml`) mới trong `docs/uml/` theo loại biểu đồ u
 ## Template tham khảo
 
 ### Use case
+
 ```plantuml
 @startuml usecase-sepsis-system
 !theme plain
@@ -48,6 +49,7 @@ sim --> UC7
 ```
 
 ### Sequence
+
 ```plantuml
 @startuml sequence-sepsis-detection
 !theme plain
@@ -71,6 +73,7 @@ UI -> "Bác sĩ" : hiển thị cảnh báo đỏ
 ```
 
 ### Class
+
 ```plantuml
 @startuml class-domain
 !theme plain

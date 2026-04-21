@@ -1,17 +1,19 @@
 {
   "apiVersion": 1,
-  "providers": [
-    {
-      "name": "Sepsis Dashboard",
-      "orgId": 1,
-      "folder": "",
-      "type": "file",
-      "disableDeletion": false,
-      "editable": true,
-      "options": {
-        "path": "/etc/grafana/provisioning/dashboards",
-        "foldersFromFilesStructure": false
-      }
-    }
-  ]
+  "providers":
+    [
+      {
+        "name": "Sepsis Dashboard",
+        "orgId": 1,
+        "folder": "",
+        "type": "file",
+        "disableDeletion": false,
+        "editable": true,
+        "options":
+          {
+            "path": "/etc/grafana/provisioning/dashboards",
+            "foldersFromFilesStructure": false,
+          },
+      },
+    ],
 }

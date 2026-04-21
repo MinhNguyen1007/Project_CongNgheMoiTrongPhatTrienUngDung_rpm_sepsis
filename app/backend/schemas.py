@@ -7,7 +7,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-
 Role = Literal["admin", "doctor", "viewer"]
 
 
@@ -136,5 +135,5 @@ class AlertResponse(BaseModel):
 
 class AcknowledgeRequest(BaseModel):
     """Body for PUT /alerts/{id}/acknowledge."""
-    pass  # username comes from JWT token
 
+    pass  # username comes from JWT token

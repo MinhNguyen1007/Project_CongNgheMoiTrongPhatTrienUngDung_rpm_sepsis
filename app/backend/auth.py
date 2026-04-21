@@ -7,7 +7,7 @@ Both are already in requirements.txt from session 6 scaffold.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -37,7 +37,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     s = get_settings()
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=s.jwt_expire_minutes))
+    expire = datetime.now(UTC) + (expires_delta or timedelta(minutes=s.jwt_expire_minutes))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, s.jwt_secret, algorithm=s.jwt_algorithm)
 

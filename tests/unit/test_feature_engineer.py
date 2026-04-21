@@ -13,8 +13,7 @@ import pytest
 
 pytest.importorskip("numpy")
 
-from consumer.feature_engineer import FeatureEngineer  # noqa: E402
-
+from consumer.feature_engineer import FeatureEngineer
 
 # Expected feature count:
 #   8 vitals * 3 windows * 5 stats (mean/std/min/max/slope) = 120

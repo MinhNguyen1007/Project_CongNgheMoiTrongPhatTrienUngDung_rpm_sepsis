@@ -19,10 +19,11 @@ Delegate viết báo cáo cho subagent `vietnamese-report-writer`. Mục: `$ARGU
    - Kết quả experiment có trong MLflow chưa? (cho mục 3.4)
 3. Spawn `vietnamese-report-writer` với prompt:
    > "Viết/chỉnh sửa mục [X] của báo cáo đồ án. Context:
+   >
    > - Kiến trúc hệ thống: xem CLAUDE.md.
    > - Biểu đồ liên quan: [liệt kê từ docs/uml/].
    > - Kết quả: [từ MLflow hoặc docs/experiments.md].
-   > Tuân thủ glossary và checklist trong skill `report-section`."
+   >   Tuân thủ glossary và checklist trong skill `report-section`."
 4. Lưu output vào `docs/report/<section>.md`.
 5. Báo cáo diff (số dòng thêm/sửa) cho user.
 

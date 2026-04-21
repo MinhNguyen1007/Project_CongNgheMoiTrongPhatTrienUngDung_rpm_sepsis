@@ -43,11 +43,14 @@ data/features_relabeled/
 mlruns/
 mlartifacts/
 artifacts/
+ml/kaggle/output/
+mlops/drift/reports/
 *.pkl
 *.pt
 *.pth
 *.onnx
 *.h5
+*.cbm
 
 # ── Docker / infra ──────────────────────────────────────
 .docker/

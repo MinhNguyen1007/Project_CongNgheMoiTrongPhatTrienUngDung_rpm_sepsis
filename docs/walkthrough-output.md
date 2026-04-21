@@ -22,12 +22,14 @@
 ```
 
 ### Ý nghĩa
+
 - Script chạy 4 bước: **Docker core → verify MLflow → spawn backend/frontend/consumer**.
 - Tất cả container `healthy` = passed healthcheck (Postgres, MinIO) hoặc `Running` = đang chạy chưa có healthcheck (LocalStack, Redis, MLflow).
 - `minio-init` **Exited 0** là bình thường — nó là init-container chỉ tạo bucket rồi tắt.
 - Backend/Frontend/Consumer chạy **3 cửa sổ PowerShell mới** (không phải Docker) → tiện debug, reload code nhanh.
 
 ### Bài học
+
 - **Profile-based compose:** core services luôn chạy, monitoring (Grafana/Prometheus) chỉ bật khi cần → tiết kiệm RAM.
 - **Native dev server** thay vì dockerized backend → hot-reload `--reload` của uvicorn hoạt động.
 
@@ -41,12 +43,14 @@ $T = (curl.exe -s -X POST http://localhost:8000/auth/login `
 ```
 
 ### Ý nghĩa
+
 - Backend tự seed user `admin/admin123` khi lifespan khởi động lần đầu.
 - Response trả JSON `{"access_token": "eyJhbGci...", "token_type": "bearer"}`.
 - `ConvertFrom-Json` parse JSON → object PowerShell, lấy `.access_token` lưu vào biến `$T`.
 - Mọi request sau gắn header `Authorization: Bearer $T`.
 
 ### Bài học
+
 - **JWT pattern:** stateless auth. Server không lưu session, chỉ sign token bằng secret key.
 - Token chứa claim `{sub, role, exp}` — backend verify chữ ký + role mỗi request.
 
@@ -64,6 +68,7 @@ warmup_hours    : 0
 ```
 
 ### Ý nghĩa
+
 - Backend load model từ MLflow Registry: `sepsis-lgbm-prod` **version 1** (trong .env `MODEL_URI=models:/sepsis-lgbm-prod/1`).
 - `feature_count=134` = 131 rolling/clinical features + 3 demographics (Age, Gender, HospAdmTime).
 - `threshold=0.04` = ngưỡng xác suất → nếu proba ≥ 0.04 tính là "above".
@@ -71,6 +76,7 @@ warmup_hours    : 0
 - `warmup_hours=0` = không cần chờ warmup từ đầu ICU.
 
 ### Bài học
+
 - Backend **tự bootstrap threshold + k từ MLflow run artifact** (`best_threshold.json`) — không hardcode → model nào dùng threshold đó, tránh training/serving skew.
 - CLAUDE.md §12 ghi v4 là `models:/sepsis-lgbm-prod/4` nhưng ở đây v1 vì registry local mới tạo → **chỉ số khác** với production registry.
 
@@ -87,7 +93,9 @@ iculos_hours : 54
 ```
 
 ### Ý nghĩa
+
 Có nhiều nhóm patient_id:
+
 - `p000001–p000010` — 10 bệnh nhân PhysioNet thật (simulator replay file .psv)
 - `itest-*` — patient ảo do **integration test** tạo
 - `itest-streak-*` — test high-risk streak → alarm
@@ -96,6 +104,7 @@ Có nhiều nhóm patient_id:
 Sắp xếp theo proba giảm dần. Patient có `iculos_hours=155` (`load-d3a13f`) = mô phỏng đã nằm ICU 6.5 ngày.
 
 ### Bài học
+
 - **Redis lưu rolling state** cho mỗi patient: `meta` (iculos, last_update), `vitals` (history), `proba_history` (hysteresis).
 - Backend query từ Redis keys pattern `patient:*:meta` → tổng hợp list cho frontend.
 - Data còn sót từ session trước = **Redis volume persist** (`rpm_redis_data`).
@@ -113,12 +122,14 @@ timestamp                         proba    alarm  streak
 ```
 
 ### Ý nghĩa
+
 - 24 điểm dữ liệu (một hàng/giờ simulator) cho `p000001`.
 - Proba **tăng dần** từ 0.07 → 0.37 → model ngày càng tin đây là sepsis khi thấy nhiều giờ dữ liệu.
 - `streak=48` = cả 48 giờ đều above threshold 0.04 → thoả mãn `min_consecutive=8` nên **alarm=True**.
 - Lưu trong Redis list `patient:p000001:proba_history`, capped 48h.
 
 ### Bài học
+
 - **Hysteresis thực tế**: thay vì alert ngay khi 1 lần proba > threshold (dễ false alarm), đợi **k giờ liên tiếp**.
 - Chart Proba Timeline ở frontend Patient Detail đọc từ endpoint này.
 
@@ -134,16 +145,18 @@ patient:p000001:predictions   ← full prediction records
 ```
 
 ### Ý nghĩa
+
 76 keys = **19 patients × 4 keys mỗi patient**:
 
-| Key suffix | Nội dung | TTL/Cap |
-|---|---|---|
-| `:vitals` | HR, SBP, Temp, SpO2 raw theo giờ | capped 168h (7 ngày) |
-| `:meta` | `{iculos_hours, last_update}` hash | không expire |
-| `:proba_history` | List proba float | capped 48h |
-| `:predictions` | Full prediction JSON (có cả features) | capped 48h |
+| Key suffix       | Nội dung                              | TTL/Cap              |
+| ---------------- | ------------------------------------- | -------------------- |
+| `:vitals`        | HR, SBP, Temp, SpO2 raw theo giờ      | capped 168h (7 ngày) |
+| `:meta`          | `{iculos_hours, last_update}` hash    | không expire         |
+| `:proba_history` | List proba float                      | capped 48h           |
+| `:predictions`   | Full prediction JSON (có cả features) | capped 48h           |
 
 ### Bài học
+
 - **Namespace key**: `<resource>:<id>:<subresource>` — dễ scan, dễ ACL.
 - **List + LTRIM** cho rolling window O(1), không phải sorted set.
 - **Redis = state store** cho streaming pipeline (không phải cache thuần).
@@ -160,11 +173,13 @@ patient:p000001:predictions   ← full prediction records
 ```
 
 ### Ý nghĩa
+
 - 150 record vitals của `p000001` (nhiều lần replay cộng dồn).
 - Mỗi record = JSON string với 8 vitals + timestamp + iculos.
 - `temp: null` = bệnh nhân không được đo nhiệt giờ đó → model học từ **missing indicator**.
 
 ### Bài học
+
 - **Missing = thông tin**: bác sĩ không đo nghĩa là không nghi ngờ → pattern "absence" cũng có giá trị tiên lượng.
 - Consumer push vitals raw vào Redis ngay khi validate → frontend có thể vẽ chart vitals luôn, không chờ features.
 
@@ -180,11 +195,13 @@ patient:p000001:predictions   ← full prediction records
 ```
 
 ### Ý nghĩa
+
 - 989 alert row — bao gồm cả alert từ integration test + load test + session trước.
 - `acknowledged=false` (`f`) = chưa có bác sĩ ấn "Xác nhận".
 - `proba` field = snapshot xác suất tại **thời điểm alarm fire**.
 
 ### Bài học
+
 - **PostgreSQL = bộ nhớ dài hạn**: lịch sử audit, không expire.
 - Mỗi giờ proba > threshold → INSERT 1 row (không dedup) → dễ query theo khoảng thời gian.
 - Frontend **AlertsFeed tab History** query `GET /alerts` từ đây.
@@ -202,11 +219,13 @@ patient:p000001:predictions   ← full prediction records
 ```
 
 ### Ý nghĩa
+
 - 3 user = 3 role **RBAC** của hệ thống.
 - `is_active=t` (true) = chưa bị admin disable.
 - Password không hiện → lưu dạng bcrypt hash trong cột `hashed_password`.
 
 ### Bài học
+
 - **3 role rõ ràng:**
   - `admin` → CRUD user + ack alert + tất cả
   - `doctor` → ack alert + xem
@@ -227,11 +246,14 @@ patient:p000001:predictions   ← full prediction records
 ```
 
 ### Ý nghĩa
+
 2 table DynamoDB do LocalStack giả lập:
+
 - `patient_latest_features` — hàng mới nhất mỗi patient (131 features)
 - `patient_recent_predictions` — ngược với Redis, lưu predictions ở DynamoDB (hiện empty vì consumer có thể đã disable nhánh này)
 
 ### Bài học
+
 - **DynamoDB = NoSQL key-value**: lookup theo partition key `patient_id` O(1).
 - Dùng DynamoDB khi cần **"hàng mới nhất"** — ghi đè upsert, không tích lũy history như PostgreSQL.
 - **LocalStack** giả lập AWS API → đổi sang AWS thật chỉ cần bỏ `--endpoint-url`.
@@ -241,6 +263,7 @@ patient:p000001:predictions   ← full prediction records
 ## 11. `awslocal dynamodb scan patient_latest_features` — 131 features
 
 Output JSON rất dài với các field:
+
 ```
 slope_temp_12h   : -0.046
 std_o2sat_6h     : 1.38
@@ -255,19 +278,21 @@ patient_id       : p000003
 ```
 
 ### Ý nghĩa
+
 Đây là **output của FeatureEngineer** trong consumer. Phân loại:
 
-| Nhóm | Số lượng | Ví dụ |
-|---|---|---|
-| Rolling stats | 120 | `mean_hr_6h`, `std_sbp_12h`, `slope_temp_24h` |
-| Missing indicators | 8 | `missing_temp=1`, `missing_dbp=0` |
-| Clinical scores | 3 | `qsofa_score=1`, `sirs_count=1`, `iculos_hours=48` |
+| Nhóm               | Số lượng | Ví dụ                                              |
+| ------------------ | -------- | -------------------------------------------------- |
+| Rolling stats      | 120      | `mean_hr_6h`, `std_sbp_12h`, `slope_temp_24h`      |
+| Missing indicators | 8        | `missing_temp=1`, `missing_dbp=0`                  |
+| Clinical scores    | 3        | `qsofa_score=1`, `sirs_count=1`, `iculos_hours=48` |
 
 **Công thức:** 8 vitals × 3 cửa sổ (6/12/24h) × 5 stats (mean/std/min/max/slope) = 120 + 8 missing + 3 clinical = **131 features**.
 
 `Count: 5` = hiện có 5 patients trong bảng (scan chỉ giới hạn 1 bản ghi nhưng đếm tổng).
 
 ### Bài học
+
 - **Feature parity 100%** training ↔ serving — cùng code `FeatureEngineer` class (`ml/src/build_features.py` import trực tiếp từ `data-pipeline/consumer/feature_engineer.py`).
 - **Slope** = derivative dấu hiệu xu hướng (HR đang giảm/tăng) — quan trọng hơn absolute value trong sepsis.
 - `Type: S` (string) vì DynamoDB không có float native — cast lại khi đọc.
@@ -281,9 +306,11 @@ patient_id       : p000003
 ```
 
 ### Ý nghĩa
+
 Bảng trống — consumer hiện **không ghi** predictions vào DynamoDB (có thể đã chuyển sang Redis để tránh trùng).
 
 ### Bài học
+
 - **Không dùng DynamoDB = không sai** — chỉ là 1 tùy chọn chưa dùng.
 - Với streaming, Redis rẻ hơn DynamoDB (không tính chi phí read/write units).
 
@@ -298,11 +325,13 @@ Bảng trống — consumer hiện **không ghi** predictions vào DynamoDB (có
 ```
 
 ### Ý nghĩa
+
 - 1 shard duy nhất (đủ cho scale đồ án).
 - Retention 24h — record quá 24h sẽ bị Kinesis xoá tự động.
 - **ACTIVE** = ready to accept writes.
 
 ### Bài học
+
 - **Kinesis = message broker** tương tự Kafka.
 - **Shard** = đơn vị song song. Scale bằng cách tăng shard (1 consumer/shard).
 - Partition key = `patient_id` → đảm bảo record cùng BN rơi cùng shard → ordered processing.
@@ -316,9 +345,11 @@ An error occurred (NoSuchBucket) when calling the ListObjectsV2 operation
 ```
 
 ### Ý nghĩa
+
 LocalStack **restart mất data** (không persist) → bucket init script tạo rồi cũng mất khi restart container.
 
 ### Bài học
+
 - Nếu cần bucket, chạy lại init: `docker-compose restart localstack` hoặc:
   ```powershell
   awslocal s3 mb s3://rpm-raw-data
@@ -331,6 +362,7 @@ LocalStack **restart mất data** (không persist) → bucket init script tạo 
 ## 15. `awslocal dynamodb get-item` — Lấy 1 patient cụ thể
 
 Lấy features của `p000001` (current, `iculos_hours: 54.0`):
+
 ```
 max_hr_6h     : 100.0      ← nhịp tim cao nhất 6h qua
 mean_sbp_6h   : 105.5      ← huyết áp tâm thu trung bình — HẠ
@@ -340,12 +372,14 @@ qsofa_score   : 1          ← qSOFA dương tính 1/3
 ```
 
 ### Ý nghĩa lâm sàng
+
 - **SBP 105**, **MAP 44**, **SpO2 85** — đây là dấu hiệu **sốc nhiễm khuẩn** sớm:
   - MAP < 65 mmHg là điểm cắt cho vasopressor.
   - SpO2 < 90% cần can thiệp hô hấp.
 - Model đúng đã alarm cho patient này.
 
 ### Bài học
+
 - **Features không chỉ là số** — cần hiểu ý nghĩa lâm sàng để debug alarm đúng/sai.
 - `missing_dbp=1` → DBP không được đo → mean/std DBP vẫn tính được từ SBP+MAP công thức.
 
@@ -359,6 +393,7 @@ qsofa_score   : 1          ← qSOFA dương tính 1/3
 ```
 
 ### Ý nghĩa
+
 - Profile `monitoring` chạy riêng — không tốn RAM khi dev thường.
 - Prometheus scrape `/metrics` backend mỗi 15s.
 - Grafana pre-provisioned dashboard "Sepsis EWS".
@@ -377,6 +412,7 @@ http_requests_total{handler="/metrics",method="GET",status="2xx"} 1.0
 ```
 
 ### Ý nghĩa
+
 - **Text format** chuẩn Prometheus — human-readable.
 - 3 metric types quan trọng:
   - `counter` (chỉ tăng) — `http_requests_total`
@@ -385,6 +421,7 @@ http_requests_total{handler="/metrics",method="GET",status="2xx"} 1.0
 - Label `{handler, method, status}` → query linh hoạt (PromQL).
 
 ### Bài học
+
 - Grafana panel "p95 latency":
   ```
   histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[1m]))
@@ -406,17 +443,19 @@ tests/unit/test_utility_score.py::test_utility_tp_max_inside_optimal_window PASS
 ```
 
 ### Ý nghĩa
+
 5 module được test:
 
-| Module | Số test | Nội dung |
-|---|---|---|
-| `auth` | 4 | bcrypt hash + salted + verify |
-| `decision` | 5 | hysteresis alarm logic |
-| `feature_engineer` | 6 | 131 features + per-patient isolation |
-| `utility_score` | 6 | PhysioNet utility + warmup |
-| `validator` | 5 | vital signs trong khoảng sinh lý |
+| Module             | Số test | Nội dung                             |
+| ------------------ | ------- | ------------------------------------ |
+| `auth`             | 4       | bcrypt hash + salted + verify        |
+| `decision`         | 5       | hysteresis alarm logic               |
+| `feature_engineer` | 6       | 131 features + per-patient isolation |
+| `utility_score`    | 6       | PhysioNet utility + warmup           |
+| `validator`        | 5       | vital signs trong khoảng sinh lý     |
 
 ### Bài học
+
 - **Unit test = không cần backend chạy** — chạy pure Python, ~3s.
 - Test `test_per_patient_isolation` quan trọng: đảm bảo rolling window của BN A không leak vào BN B.
 
@@ -434,6 +473,7 @@ test_predict_flow.py::test_high_risk_streak_triggers_alarm_and_persists PASSED
 ```
 
 ### Ý nghĩa
+
 - Gọi HTTP thật đến backend `http://localhost:8000`.
 - Test cover:
   - **RBAC** (viewer không ack được, admin được)
@@ -442,6 +482,7 @@ test_predict_flow.py::test_high_risk_streak_triggers_alarm_and_persists PASSED
 - 72s = bcrypt slow (~300ms mỗi hash) × 20 lần login.
 
 ### Bài học
+
 - **Skip-if-backend-down pattern**: fixture `backend_up` dùng `pytest.skip(...)` nếu `/health` không reachable → CI unit job vẫn pass khi Docker chưa lên.
 - **Integration test = safety net** khi refactor — chỉ cần 11 test đã cover 80% happy path.
 
@@ -460,12 +501,14 @@ GET   /alerts        12      0        364   1300ms
 ```
 
 ### Ý nghĩa
+
 - **530 requests** trong 20s, **0 failure**.
 - `/predict` p95 = **270ms** — dưới SLO 500ms §10 CLAUDE.md → **PASS**.
 - `/auth/login` chậm 4.8s p95 — **bcrypt cost** (verify password tốn CPU). Nhưng chỉ hit 1 lần/user `on_start()`.
 - `/patients` p95 2700ms — chậm vì scan nhiều Redis keys (19 patient × 4 key).
 
 ### Bài học
+
 - **SLO metric chính** cho inference: `/predict` p95 (đường nóng từ consumer).
 - Load test không chỉ để test scale — còn để **khám phá bottleneck**. Ở đây thấy `/patients` chậm nếu nhiều BN → cần cache.
 - Locust task `@task(3)` vs `@task(1)` = trọng số gọi — mô phỏng 3 lần GET patients cho mỗi lần GET alerts.
@@ -501,6 +544,7 @@ GET   /alerts        12      0        364   1300ms
 ```
 
 ### Bài học tổng
+
 1. **Mỗi storage có vai trò riêng:**
    - Kinesis = queue
    - DynamoDB = latest-value NoSQL
@@ -515,4 +559,4 @@ GET   /alerts        12      0        364   1300ms
 
 ---
 
-*File tạo tự động từ session tour ngày 2026-04-21. Xem CLAUDE.md §12 cho lịch sử quyết định thiết kế.*
+_File tạo tự động từ session tour ngày 2026-04-21. Xem CLAUDE.md §12 cho lịch sử quyết định thiết kế._

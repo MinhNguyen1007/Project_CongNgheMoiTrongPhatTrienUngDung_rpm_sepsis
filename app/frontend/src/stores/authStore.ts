@@ -37,7 +37,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: persisted.token !== null,
 
   login: (token, username, role) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ token, username, role }));
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ token, username, role }),
+    );
     set({ token, username, role, isAuthenticated: true });
   },
 

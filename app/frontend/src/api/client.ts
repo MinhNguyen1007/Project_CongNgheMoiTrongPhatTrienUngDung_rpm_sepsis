@@ -94,11 +94,16 @@ export const api = {
       headers: authHeaders(),
     }).then((res) => {
       if (res.status === 401) useAuthStore.getState().logout();
-      if (!res.ok && res.status !== 204) throw new Error(`${res.status} ${res.statusText}`);
+      if (!res.ok && res.status !== 204)
+        throw new Error(`${res.status} ${res.statusText}`);
     }),
 
   // ── Alerts (persisted) ──
-  alerts: (params?: { patient_id?: string; acknowledged?: boolean; limit?: number }) => {
+  alerts: (params?: {
+    patient_id?: string;
+    acknowledged?: boolean;
+    limit?: number;
+  }) => {
     const query = new URLSearchParams();
     if (params?.patient_id) query.set("patient_id", params.patient_id);
     if (params?.acknowledged !== undefined)

@@ -43,16 +43,12 @@ from sklearn.metrics import average_precision_score, roc_auc_score
 
 load_dotenv()
 os.environ["AWS_ACCESS_KEY_ID"] = os.environ.get("MINIO_ROOT_USER", "minioadmin")
-os.environ["AWS_SECRET_ACCESS_KEY"] = os.environ.get(
-    "MINIO_ROOT_PASSWORD", "minioadmin123"
-)
+os.environ["AWS_SECRET_ACCESS_KEY"] = os.environ.get("MINIO_ROOT_PASSWORD", "minioadmin123")
 
 from build_features import get_model_feature_columns
 from utility_score import compute_normalized_utility
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 LABEL_COL = "SepsisLabel"
@@ -94,9 +90,7 @@ def predict_lgbm(model_uri: str, df: pd.DataFrame, features: list[str]) -> np.nd
     return model.predict(X)
 
 
-def join_probas(
-    lgbm_df: pd.DataFrame, catboost_df: pd.DataFrame, split_name: str
-) -> pd.DataFrame:
+def join_probas(lgbm_df: pd.DataFrame, catboost_df: pd.DataFrame, split_name: str) -> pd.DataFrame:
     """Inner-join on (patient_id, ICULOS) so row alignment is unambiguous.
 
     Catboost parquet has `ICULOS`; local features parquet also has `ICULOS`.
@@ -108,7 +102,7 @@ def join_probas(
         assert col in catboost_df.columns, f"{col} missing in catboost_df"
 
     merged = lgbm_df.merge(
-        catboost_df[key_cols + ["proba"]].rename(columns={"proba": "catboost_proba"}),
+        catboost_df[[*key_cols, "proba"]].rename(columns={"proba": "catboost_proba"}),
         on=key_cols,
         how="inner",
     )
@@ -116,7 +110,10 @@ def join_probas(
         logger.warning(
             "%s row-count mismatch: lgbm=%d catboost=%d merged=%d — "
             "ensemble only uses overlapping rows",
-            split_name, len(lgbm_df), len(catboost_df), len(merged),
+            split_name,
+            len(lgbm_df),
+            len(catboost_df),
+            len(merged),
         )
     return merged
 
@@ -136,12 +133,18 @@ def tune_decision(
         for k in k_grid:
             for warmup in warmup_grid:
                 u = compute_normalized_utility(
-                    pred_df, "prediction", LABEL_COL, PATIENT_COL,
-                    min_consecutive=k, warmup_hours=warmup,
+                    pred_df,
+                    "prediction",
+                    LABEL_COL,
+                    PATIENT_COL,
+                    min_consecutive=k,
+                    warmup_hours=warmup,
                 )
                 row = {
-                    "threshold": float(thr), "min_consecutive": int(k),
-                    "warmup_hours": int(warmup), **u,
+                    "threshold": float(thr),
+                    "min_consecutive": int(k),
+                    "warmup_hours": int(warmup),
+                    **u,
                 }
                 results.append(row)
                 if u["normalized_utility"] > best["normalized_utility"]:
@@ -151,21 +154,27 @@ def tune_decision(
 
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("--lgbm-uri", required=True,
-                   help="MLflow URI of the LightGBM model (models:/ or runs:/).")
-    p.add_argument("--catboost-dir", type=Path, required=True,
-                   help="Directory with val_proba.parquet + test_proba.parquet from Kaggle.")
-    p.add_argument("--features-dir", type=Path, default=Path("data/features"),
-                   help="Features dir used for val/test (original labels on test).")
+    p.add_argument(
+        "--lgbm-uri", required=True, help="MLflow URI of the LightGBM model (models:/ or runs:/)."
+    )
+    p.add_argument(
+        "--catboost-dir",
+        type=Path,
+        required=True,
+        help="Directory with val_proba.parquet + test_proba.parquet from Kaggle.",
+    )
+    p.add_argument(
+        "--features-dir",
+        type=Path,
+        default=Path("data/features"),
+        help="Features dir used for val/test (original labels on test).",
+    )
     p.add_argument("--experiment", default="sepsis-ensemble")
     p.add_argument("--model-name", default="sepsis-ensemble-prod")
     p.add_argument("--register", action="store_true")
-    p.add_argument("--threshold-grid", nargs=3, type=float,
-                   default=[0.02, 0.95, 0.02])
-    p.add_argument("--consecutive-grid", nargs="+", type=int,
-                   default=[1, 2, 3, 4, 6, 8, 12, 16])
-    p.add_argument("--warmup-grid", nargs="+", type=int,
-                   default=[0, 6, 12, 18, 24, 36, 48])
+    p.add_argument("--threshold-grid", nargs=3, type=float, default=[0.02, 0.95, 0.02])
+    p.add_argument("--consecutive-grid", nargs="+", type=int, default=[1, 2, 3, 4, 6, 8, 12, 16])
+    p.add_argument("--warmup-grid", nargs="+", type=int, default=[0, 6, 12, 18, 24, 36, 48])
     args = p.parse_args()
 
     mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "http://localhost:5000"))
@@ -204,8 +213,12 @@ def main() -> None:
     y_test = test_joined[LABEL_COL].astype(int).to_numpy()
     ens_test = meta.predict_proba(X_meta_test)[:, 1]
 
-    logger.info("Meta coefs: lgbm=%.3f catboost=%.3f intercept=%.3f",
-                meta.coef_[0, 0], meta.coef_[0, 1], meta.intercept_[0])
+    logger.info(
+        "Meta coefs: lgbm=%.3f catboost=%.3f intercept=%.3f",
+        meta.coef_[0, 0],
+        meta.coef_[0, 1],
+        meta.intercept_[0],
+    )
 
     # ── Metrics ──────────────────────────────────────────────────────────
     val_auroc = float(roc_auc_score(y_val, ens_val))
@@ -216,63 +229,88 @@ def main() -> None:
     # ── Tune decision on val ensemble proba ──────────────────────────────
     thr_grid = np.arange(*args.threshold_grid)
     best, grid_results = tune_decision(
-        val_joined, ens_val, thr_grid, args.consecutive_grid, args.warmup_grid,
+        val_joined,
+        ens_val,
+        thr_grid,
+        args.consecutive_grid,
+        args.warmup_grid,
     )
-    logger.info("Best val: util=%.4f thr=%.3f k=%d warmup=%dh",
-                best["normalized_utility"], best["threshold"],
-                best["min_consecutive"], best["warmup_hours"])
+    logger.info(
+        "Best val: util=%.4f thr=%.3f k=%d warmup=%dh",
+        best["normalized_utility"],
+        best["threshold"],
+        best["min_consecutive"],
+        best["warmup_hours"],
+    )
 
     # ── Evaluate on test ────────────────────────────────────────────────
     test_pred_df = test_joined[[PATIENT_COL, LABEL_COL]].copy()
     test_pred_df["prediction"] = (ens_test >= best["threshold"]).astype(int)
     test_util = compute_normalized_utility(
-        test_pred_df, "prediction", LABEL_COL, PATIENT_COL,
+        test_pred_df,
+        "prediction",
+        LABEL_COL,
+        PATIENT_COL,
         min_consecutive=best["min_consecutive"],
         warmup_hours=best["warmup_hours"],
     )
 
     with mlflow.start_run() as run:
-        mlflow.log_params({
-            "lgbm_uri": args.lgbm_uri,
-            "catboost_dir": str(args.catboost_dir),
-            "n_features": len(features),
-            "n_val_rows": len(val_joined),
-            "n_test_rows": len(test_joined),
-            "meta_lgbm_coef": float(meta.coef_[0, 0]),
-            "meta_catboost_coef": float(meta.coef_[0, 1]),
-            "meta_intercept": float(meta.intercept_[0]),
-        })
-        mlflow.log_metrics({
-            "val_auroc": val_auroc,
-            "val_auprc": val_auprc,
-            "val_normalized_utility": float(best["normalized_utility"]),
-            "test_auroc": test_auroc,
-            "test_auprc": test_auprc,
-            "test_normalized_utility": float(test_util["normalized_utility"]),
-            "best_threshold": float(best["threshold"]),
-            "best_min_consecutive": float(best["min_consecutive"]),
-            "best_warmup_hours": float(best["warmup_hours"]),
-            "test_tp": int(test_util["tp"]),
-            "test_fn": int(test_util["fn"]),
-            "test_fp": int(test_util["fp"]),
-            "test_tn": int(test_util["tn"]),
-        })
+        mlflow.log_params(
+            {
+                "lgbm_uri": args.lgbm_uri,
+                "catboost_dir": str(args.catboost_dir),
+                "n_features": len(features),
+                "n_val_rows": len(val_joined),
+                "n_test_rows": len(test_joined),
+                "meta_lgbm_coef": float(meta.coef_[0, 0]),
+                "meta_catboost_coef": float(meta.coef_[0, 1]),
+                "meta_intercept": float(meta.intercept_[0]),
+            }
+        )
+        mlflow.log_metrics(
+            {
+                "val_auroc": val_auroc,
+                "val_auprc": val_auprc,
+                "val_normalized_utility": float(best["normalized_utility"]),
+                "test_auroc": test_auroc,
+                "test_auprc": test_auprc,
+                "test_normalized_utility": float(test_util["normalized_utility"]),
+                "best_threshold": float(best["threshold"]),
+                "best_min_consecutive": float(best["min_consecutive"]),
+                "best_warmup_hours": float(best["warmup_hours"]),
+                "test_tp": int(test_util["tp"]),
+                "test_fn": int(test_util["fn"]),
+                "test_fp": int(test_util["fp"]),
+                "test_tn": int(test_util["tn"]),
+            }
+        )
 
         art = Path("artifacts") / f"ensemble_{run.info.run_id[:8]}"
         art.mkdir(parents=True, exist_ok=True)
         pd.DataFrame(grid_results).to_csv(art / "threshold_grid.csv", index=False)
-        (art / "meta_model.json").write_text(json.dumps({
-            "lgbm_coef": float(meta.coef_[0, 0]),
-            "catboost_coef": float(meta.coef_[0, 1]),
-            "intercept": float(meta.intercept_[0]),
-        }, indent=2))
-        (art / "best_threshold.json").write_text(json.dumps({
-            "threshold": float(best["threshold"]),
-            "min_consecutive": int(best["min_consecutive"]),
-            "warmup_hours": int(best["warmup_hours"]),
-            "normalized_utility_val": float(best["normalized_utility"]),
-            "normalized_utility_test": float(test_util["normalized_utility"]),
-        }, indent=2))
+        (art / "meta_model.json").write_text(
+            json.dumps(
+                {
+                    "lgbm_coef": float(meta.coef_[0, 0]),
+                    "catboost_coef": float(meta.coef_[0, 1]),
+                    "intercept": float(meta.intercept_[0]),
+                },
+                indent=2,
+            )
+        )
+        (art / "best_threshold.json").write_text(
+            json.dumps(
+                {
+                    "threshold": float(best["threshold"]),
+                    "min_consecutive": int(best["min_consecutive"]),
+                    "warmup_hours": int(best["warmup_hours"]),
+                    "normalized_utility_val": float(best["normalized_utility"]),
+                    "normalized_utility_test": float(test_util["normalized_utility"]),
+                },
+                indent=2,
+            )
+        )
         mlflow.log_artifacts(str(art))
 
         # Register meta-learner (small LR). Base models remain separate.
@@ -284,9 +322,13 @@ def main() -> None:
         logger.info("  AUROC           : %.4f", test_auroc)
         logger.info("  AUPRC           : %.4f", test_auprc)
         logger.info("  Normalized Util : %.4f", test_util["normalized_utility"])
-        logger.info("  Patients        : TP=%d FN=%d FP=%d TN=%d",
-                    test_util["tp"], test_util["fn"],
-                    test_util["fp"], test_util["tn"])
+        logger.info(
+            "  Patients        : TP=%d FN=%d FP=%d TN=%d",
+            test_util["tp"],
+            test_util["fn"],
+            test_util["fp"],
+            test_util["tn"],
+        )
         logger.info("=" * 60)
 
 

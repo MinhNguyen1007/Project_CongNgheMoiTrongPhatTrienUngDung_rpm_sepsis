@@ -16,7 +16,6 @@ Download all five artifacts and commit to MLflow locally for ensemble.
 """
 
 import json
-import os
 from pathlib import Path
 
 import numpy as np
@@ -81,7 +80,9 @@ def compute_normalized_utility(df, pred_col, min_consecutive=1, warmup_hours=0):
             counts["fp" if has_alarm else "tn"] += 1
     return {
         "normalized_utility": raw_u / max_u if max_u else 0.0,
-        "raw_utility": raw_u, "max_utility": max_u, **counts,
+        "raw_utility": raw_u,
+        "max_utility": max_u,
+        **counts,
     }
 
 
@@ -92,16 +93,21 @@ val_df = pd.read_parquet(INPUT_DIR / "val.parquet")
 test_df = pd.read_parquet(INPUT_DIR / "test.parquet")
 
 feature_cols = sorted(
-    c for c in train_df.columns
-    if c not in NON_FEATURE_COLS and train_df[c].dtype != object
+    c for c in train_df.columns if c not in NON_FEATURE_COLS and train_df[c].dtype != object
 )
 print(f"  features: {len(feature_cols)}")
-print(f"  train: {len(train_df):,} rows, {train_df[PATIENT_COL].nunique():,} patients,"
-      f" pos={train_df[LABEL_COL].mean() * 100:.2f}%")
-print(f"  val  : {len(val_df):,} rows, {val_df[PATIENT_COL].nunique():,} patients,"
-      f" pos={val_df[LABEL_COL].mean() * 100:.2f}%")
-print(f"  test : {len(test_df):,} rows, {test_df[PATIENT_COL].nunique():,} patients,"
-      f" pos={test_df[LABEL_COL].mean() * 100:.2f}%")
+print(
+    f"  train: {len(train_df):,} rows, {train_df[PATIENT_COL].nunique():,} patients,"
+    f" pos={train_df[LABEL_COL].mean() * 100:.2f}%"
+)
+print(
+    f"  val  : {len(val_df):,} rows, {val_df[PATIENT_COL].nunique():,} patients,"
+    f" pos={val_df[LABEL_COL].mean() * 100:.2f}%"
+)
+print(
+    f"  test : {len(test_df):,} rows, {test_df[PATIENT_COL].nunique():,} patients,"
+    f" pos={test_df[LABEL_COL].mean() * 100:.2f}%"
+)
 
 
 def xy(df):
@@ -117,24 +123,24 @@ X_te, y_te = xy(test_df)
 # ── Train CatBoost on GPU ──────────────────────────────────────────────────
 # scale_pos_weight=10 matches the LightGBM run (decision #17) — mild reweight
 # so probas stay calibrated. CatBoost handles NaN natively via nan_mode="Min".
-params = dict(
-    iterations=5000,
-    learning_rate=0.03,
-    depth=8,
-    l2_leaf_reg=3.0,
-    bagging_temperature=0.5,
-    random_strength=1.0,
-    border_count=128,
-    nan_mode="Min",
-    loss_function="Logloss",
-    eval_metric="AUC",
-    scale_pos_weight=10.0,
-    task_type="GPU",
-    devices="0",
-    verbose=200,
-    early_stopping_rounds=200,
-    random_seed=42,
-)
+params = {
+    "iterations": 5000,
+    "learning_rate": 0.03,
+    "depth": 8,
+    "l2_leaf_reg": 3.0,
+    "bagging_temperature": 0.5,
+    "random_strength": 1.0,
+    "border_count": 128,
+    "nan_mode": "Min",
+    "loss_function": "Logloss",
+    "eval_metric": "AUC",
+    "scale_pos_weight": 10.0,
+    "task_type": "GPU",
+    "devices": "0",
+    "verbose": 200,
+    "early_stopping_rounds": 200,
+    "random_seed": 42,
+}
 
 print("\nTraining CatBoost (GPU)...")
 model = CatBoostClassifier(**params)
@@ -167,8 +173,12 @@ for thr in thr_grid:
     for k in k_grid:
         for warmup in warmup_grid:
             u = compute_normalized_utility(pred_df, "prediction", k, warmup)
-            row = {"threshold": float(thr), "min_consecutive": int(k),
-                   "warmup_hours": int(warmup), **u}
+            row = {
+                "threshold": float(thr),
+                "min_consecutive": int(k),
+                "warmup_hours": int(warmup),
+                **u,
+            }
             results.append(row)
             if u["normalized_utility"] > best["normalized_utility"]:
                 best = row
@@ -177,52 +187,67 @@ best_thr = best["threshold"]
 best_k = best["min_consecutive"]
 best_warmup = best["warmup_hours"]
 best_util_val = best["normalized_utility"]
-print(f"\nBest val: util={best_util_val:.4f} thr={best_thr:.3f}"
-      f" k={best_k} warmup={best_warmup}h")
+print(f"\nBest val: util={best_util_val:.4f} thr={best_thr:.3f} k={best_k} warmup={best_warmup}h")
 
 # ── Evaluate on test with tuned decision ───────────────────────────────────
 test_pred_df = test_df[[PATIENT_COL, LABEL_COL]].copy()
 test_pred_df["prediction"] = (test_proba >= best_thr).astype(int)
-test_util = compute_normalized_utility(
-    test_pred_df, "prediction", best_k, best_warmup
-)
+test_util = compute_normalized_utility(test_pred_df, "prediction", best_k, best_warmup)
 print(f"\nTest Normalized Utility = {test_util['normalized_utility']:.4f}")
-print(f"  patients: TP={test_util['tp']} FN={test_util['fn']}"
-      f" FP={test_util['fp']} TN={test_util['tn']}")
+print(
+    f"  patients: TP={test_util['tp']} FN={test_util['fn']}"
+    f" FP={test_util['fp']} TN={test_util['tn']}"
+)
 
 # ── Save artifacts ─────────────────────────────────────────────────────────
 model.save_model(str(OUT_DIR / "catboost_model.cbm"))
 
-pd.DataFrame({
-    PATIENT_COL: val_df[PATIENT_COL].values,
-    "ICULOS": val_df.get("ICULOS", pd.Series(np.arange(len(val_df)))).values,
-    LABEL_COL: y_va,
-    "proba": val_proba,
-}).to_parquet(OUT_DIR / "val_proba.parquet", index=False)
+pd.DataFrame(
+    {
+        PATIENT_COL: val_df[PATIENT_COL].values,
+        "ICULOS": val_df.get("ICULOS", pd.Series(np.arange(len(val_df)))).values,
+        LABEL_COL: y_va,
+        "proba": val_proba,
+    }
+).to_parquet(OUT_DIR / "val_proba.parquet", index=False)
 
-pd.DataFrame({
-    PATIENT_COL: test_df[PATIENT_COL].values,
-    "ICULOS": test_df.get("ICULOS", pd.Series(np.arange(len(test_df)))).values,
-    LABEL_COL: y_te,
-    "proba": test_proba,
-}).to_parquet(OUT_DIR / "test_proba.parquet", index=False)
+pd.DataFrame(
+    {
+        PATIENT_COL: test_df[PATIENT_COL].values,
+        "ICULOS": test_df.get("ICULOS", pd.Series(np.arange(len(test_df)))).values,
+        LABEL_COL: y_te,
+        "proba": test_proba,
+    }
+).to_parquet(OUT_DIR / "test_proba.parquet", index=False)
 
-(OUT_DIR / "best_params.json").write_text(json.dumps({
-    "threshold": best_thr,
-    "min_consecutive": best_k,
-    "warmup_hours": best_warmup,
-    "val_normalized_utility": best_util_val,
-}, indent=2))
+(OUT_DIR / "best_params.json").write_text(
+    json.dumps(
+        {
+            "threshold": best_thr,
+            "min_consecutive": best_k,
+            "warmup_hours": best_warmup,
+            "val_normalized_utility": best_util_val,
+        },
+        indent=2,
+    )
+)
 
-(OUT_DIR / "test_metrics.json").write_text(json.dumps({
-    "val_auroc": val_auroc, "val_auprc": val_auprc,
-    "test_auroc": test_auroc, "test_auprc": test_auprc,
-    "test_normalized_utility": float(test_util["normalized_utility"]),
-    "test_raw_utility": float(test_util["raw_utility"]),
-    "test_patient_counts": {k: int(test_util[k]) for k in ("tp", "fn", "fp", "tn")},
-    "best_iteration": int(model.tree_count_),
-    "n_features": len(feature_cols),
-}, indent=2))
+(OUT_DIR / "test_metrics.json").write_text(
+    json.dumps(
+        {
+            "val_auroc": val_auroc,
+            "val_auprc": val_auprc,
+            "test_auroc": test_auroc,
+            "test_auprc": test_auprc,
+            "test_normalized_utility": float(test_util["normalized_utility"]),
+            "test_raw_utility": float(test_util["raw_utility"]),
+            "test_patient_counts": {k: int(test_util[k]) for k in ("tp", "fn", "fp", "tn")},
+            "best_iteration": int(model.tree_count_),
+            "n_features": len(feature_cols),
+        },
+        indent=2,
+    )
+)
 
 pd.DataFrame(results).to_csv(OUT_DIR / "threshold_grid.csv", index=False)
 

@@ -49,10 +49,7 @@ export function PatientDetail() {
   const health = useQuery({ queryKey: ["health"], queryFn: api.health });
 
   // Server-backed proba history (persists across refresh)
-  const {
-    data: probaData,
-    isLoading: probaLoading,
-  } = useQuery({
+  const { data: probaData, isLoading: probaLoading } = useQuery({
     queryKey: ["proba_history", patientId],
     queryFn: () => api.probaHistory(patientId),
     refetchInterval: 10_000,
@@ -60,10 +57,7 @@ export function PatientDetail() {
   });
 
   // Server-backed vitals history
-  const {
-    data: vitalsData,
-    isLoading: vitalsLoading,
-  } = useQuery({
+  const { data: vitalsData, isLoading: vitalsLoading } = useQuery({
     queryKey: ["vitals", patientId],
     queryFn: () => api.vitals(patientId, 72),
     refetchInterval: 10_000,
@@ -115,9 +109,8 @@ export function PatientDetail() {
       }));
   }, [vitalsData]);
 
-  const latestProba = probaTrend.length > 0
-    ? probaTrend[probaTrend.length - 1].proba
-    : null;
+  const latestProba =
+    probaTrend.length > 0 ? probaTrend[probaTrend.length - 1].proba : null;
 
   if (!patient && !probaLoading && probaTrend.length === 0) {
     return (
@@ -132,19 +125,14 @@ export function PatientDetail() {
     );
   }
 
-  const tone = latestProba !== null
-    ? probaTone(latestProba, threshold)
-    : "ok";
+  const tone = latestProba !== null ? probaTone(latestProba, threshold) : "ok";
 
   return (
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <Link
-            to="/"
-            className="text-sm text-slate-500 hover:text-slate-700"
-          >
+          <Link to="/" className="text-sm text-slate-500 hover:text-slate-700">
             ← Danh sách
           </Link>
           <h2 className="mt-1 text-2xl font-semibold text-slate-900">
@@ -160,9 +148,7 @@ export function PatientDetail() {
           )}
         </div>
         {latestProba !== null && (
-          <Badge tone={tone}>
-            Proba {(latestProba * 100).toFixed(1)}%
-          </Badge>
+          <Badge tone={tone}>Proba {(latestProba * 100).toFixed(1)}%</Badge>
         )}
       </div>
 
@@ -331,7 +317,11 @@ export function PatientDetail() {
                 tick={{ fontSize: 11 }}
                 tickFormatter={(v) => `${v}°`}
               />
-              <Tooltip formatter={(v) => (typeof v === "number" ? `${v.toFixed(1)}°C` : String(v))} />
+              <Tooltip
+                formatter={(v) =>
+                  typeof v === "number" ? `${v.toFixed(1)}°C` : String(v)
+                }
+              />
               <ReferenceLine
                 y={38}
                 stroke="#f59e0b"
@@ -359,7 +349,8 @@ export function PatientDetail() {
       </div>
 
       <p className="text-xs text-slate-400">
-        Dữ liệu từ server, auto-refresh mỗi 10s. Chart persist sau khi refresh trang.
+        Dữ liệu từ server, auto-refresh mỗi 10s. Chart persist sau khi refresh
+        trang.
       </p>
     </div>
   );

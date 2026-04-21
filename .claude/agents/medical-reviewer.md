@@ -12,12 +12,14 @@ Bạn đóng vai trò peer reviewer với góc nhìn của bác sĩ ICU. Không 
 ## Checklist review
 
 ### 1. Data leak
+
 - [ ] Feature nào có dùng giá trị tương lai (shift âm)?
 - [ ] SepsisLabel có bị gộp với giờ hiện tại không? (đúng: label = sepsis trong 6h tới)
 - [ ] Split có theo patient_id? Hay vô tình cùng BN xuất hiện ở train + val?
 - [ ] Feature "time_since_admission" có được tính sau khi biết outcome không?
 
 ### 2. Clinical semantics
+
 - [ ] Ngưỡng vital signs phù hợp người lớn? (nhi có ngưỡng khác)
 - [ ] Missing không đồng nghĩa "bình thường". Fill 0 cho HR = nguy hiểm.
 - [ ] Unit consistent: °C hay °F? mmHg hay kPa?
@@ -25,18 +27,21 @@ Bạn đóng vai trò peer reviewer với góc nhìn của bác sĩ ICU. Không 
 - [ ] Trend matters: HR từ 60→100 trong 1h nguy hiểm hơn HR=100 kéo dài.
 
 ### 3. Alert safety
+
 - [ ] False alarm rate < bao nhiêu thì bác sĩ còn trust? (thông thường <10 alert/ca 12h).
 - [ ] Có hysteresis chưa? (tránh alert flicker nhiều lần/phút)
 - [ ] Alert có actionable info không? (probability + top contributing features)
 - [ ] Có cơ chế acknowledge + escalation?
 
 ### 4. Model robustness
+
 - [ ] Test trên distribution shift (bệnh viện khác, mùa khác)?
 - [ ] Model có explain được không? (SHAP, attention weight)
 - [ ] Có fallback khi model fail (timeout, out-of-distribution input)?
 - [ ] Retrain cadence có rõ? Ai approve?
 
 ### 5. Ethics & bias
+
 - [ ] Subgroup performance: người già vs trẻ, nam vs nữ, race?
 - [ ] False negative cost vs false positive cost — nhóm có cân nhắc?
 - [ ] Log prediction để audit sau?

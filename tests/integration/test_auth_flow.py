@@ -25,9 +25,7 @@ def test_viewer_cannot_list_users(backend_up: str, ephemeral_user: dict[str, str
     assert r.status_code == 403
 
 
-def test_viewer_cannot_acknowledge_alert(
-    backend_up: str, ephemeral_user: dict[str, str]
-):
+def test_viewer_cannot_acknowledge_alert(backend_up: str, ephemeral_user: dict[str, str]):
     token = token_for(backend_up, ephemeral_user["username"], ephemeral_user["password"])
     # Hit a non-existent alert; role check happens before 404 lookup
     r = httpx.put(
@@ -67,9 +65,7 @@ def test_register_validates_role_enum(backend_up: str, admin_headers: dict[str, 
     assert r.status_code == 422
 
 
-def test_admin_cannot_delete_self(
-    backend_up: str, admin_headers: dict[str, str]
-):
+def test_admin_cannot_delete_self(backend_up: str, admin_headers: dict[str, str]):
     me = httpx.get(f"{backend_up}/auth/me", headers=admin_headers).json()
     r = httpx.delete(f"{backend_up}/auth/users/{me['id']}", headers=admin_headers)
     assert r.status_code == 400

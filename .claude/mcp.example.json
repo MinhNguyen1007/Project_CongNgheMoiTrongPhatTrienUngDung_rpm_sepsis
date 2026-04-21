@@ -3,7 +3,11 @@
   "mcpServers": {
     "filesystem": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "d:/S2_Year4/Emerging Technologies/Project"],
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "d:/S2_Year4/Emerging Technologies/Project"
+      ],
       "$description": "MCP filesystem — cho phép Claude đọc/ghi trong thư mục project an toàn."
     },
     "github": {
@@ -25,7 +29,12 @@
     },
     "sqlite": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-sqlite", "--db-path", "./data/mlflow.db"],
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sqlite",
+        "--db-path",
+        "./data/mlflow.db"
+      ],
       "$description": "MCP SQLite — query MLflow tracking DB để list experiment offline."
     }
   }

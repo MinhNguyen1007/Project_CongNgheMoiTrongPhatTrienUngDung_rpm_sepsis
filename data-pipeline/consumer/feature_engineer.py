@@ -20,9 +20,7 @@ class FeatureEngineer:
 
     def __init__(self, max_window: int = 24) -> None:
         self.max_window = max_window
-        self._history: dict[str, deque[dict]] = defaultdict(
-            lambda: deque(maxlen=max_window)
-        )
+        self._history: dict[str, deque[dict]] = defaultdict(lambda: deque(maxlen=max_window))
 
     @property
     def patient_count(self) -> int:
@@ -36,17 +34,13 @@ class FeatureEngineer:
 
     # ── Private ────────────────────────────────────────
 
-    def _compute_features(
-        self, current: dict, history: list[dict]
-    ) -> dict[str, Any]:
+    def _compute_features(self, current: dict, history: list[dict]) -> dict[str, Any]:
         features: dict[str, Any] = {}
 
         # Rolling stats per vital sign per window
         for col in VITAL_COLUMNS:
             for window in WINDOWS:
-                values = [
-                    r[col] for r in history[-window:] if r.get(col) is not None
-                ]
+                values = [r[col] for r in history[-window:] if r.get(col) is not None]
                 suffix = f"{col.lower()}_{window}h"
 
                 if values:

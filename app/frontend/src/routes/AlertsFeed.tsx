@@ -37,10 +37,16 @@ export function AlertsFeed() {
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-slate-800">Cảnh báo</h2>
         <div className="flex gap-1">
-          <button className={tabClass(tab === "live")} onClick={() => setTab("live")}>
+          <button
+            className={tabClass(tab === "live")}
+            onClick={() => setTab("live")}
+          >
             Live ({wsEvents.length})
           </button>
-          <button className={tabClass(tab === "history")} onClick={() => setTab("history")}>
+          <button
+            className={tabClass(tab === "history")}
+            onClick={() => setTab("history")}
+          >
             Lịch sử {dbAlerts ? `(${dbAlerts.length})` : ""}
           </button>
         </div>

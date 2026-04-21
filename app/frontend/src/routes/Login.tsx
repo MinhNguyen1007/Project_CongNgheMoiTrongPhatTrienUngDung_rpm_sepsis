@@ -20,7 +20,9 @@ export function Login() {
       // Fetch user info to get role
       const authHeaders = { Authorization: `Bearer ${access_token}` };
       const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
-      const meRes = await fetch(`${BASE_URL}/auth/me`, { headers: authHeaders });
+      const meRes = await fetch(`${BASE_URL}/auth/me`, {
+        headers: authHeaders,
+      });
       if (meRes.ok) {
         const user = await meRes.json();
         login(access_token, user.username, user.role);
@@ -58,9 +60,7 @@ export function Login() {
             <h1 className="text-xl font-bold text-white">
               Sepsis Early-Warning
             </h1>
-            <p className="mt-1 text-sm text-slate-400">
-              Đăng nhập để tiếp tục
-            </p>
+            <p className="mt-1 text-sm text-slate-400">Đăng nhập để tiếp tục</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">

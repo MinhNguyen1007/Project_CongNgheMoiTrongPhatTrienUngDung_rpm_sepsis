@@ -20,7 +20,7 @@ import logging
 import os
 import sys
 import urllib.request
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -31,9 +31,7 @@ VITAL_COLUMNS = ["HR", "O2Sat", "Temp", "SBP", "MAP", "DBP", "Resp", "EtCO2"]
 DEFAULT_SAMPLE_SIZE = 10_000
 REPORT_DIR = Path(__file__).resolve().parent / "reports"
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -65,8 +63,14 @@ def _post_slack(webhook: str, text: str) -> None:
         logger.warning("Slack webhook failed: %s", exc)
 
 
-def run(reference_path: Path, current_path: Path, sample: int, seed: int,
-        slack_webhook: str | None = None, share_threshold: float = 0.3) -> Path:
+def run(
+    reference_path: Path,
+    current_path: Path,
+    sample: int,
+    seed: int,
+    slack_webhook: str | None = None,
+    share_threshold: float = 0.3,
+) -> Path:
     try:
         from evidently.metric_preset import DataDriftPreset
         from evidently.report import Report
@@ -82,7 +86,7 @@ def run(reference_path: Path, current_path: Path, sample: int, seed: int,
     report.run(reference_data=reference, current_data=current)
 
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     out = REPORT_DIR / f"drift_{stamp}.html"
     report.save_html(str(out))
 
@@ -96,7 +100,9 @@ def run(reference_path: Path, current_path: Path, sample: int, seed: int,
 
     logger.info(
         "Drift summary: dataset_drift=%s, %d drifted cols (share=%.2f)",
-        dataset_drift, n_drifted, share,
+        dataset_drift,
+        n_drifted,
+        share,
     )
     logger.info("HTML report saved to %s", out)
 
@@ -118,39 +124,48 @@ def run(reference_path: Path, current_path: Path, sample: int, seed: int,
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--reference", type=Path,
+        "--reference",
+        type=Path,
         default=Path("data/processed/train.parquet"),
         help="Reference parquet (training distribution).",
     )
     parser.add_argument(
-        "--current", type=Path,
+        "--current",
+        type=Path,
         default=Path("data/processed/val.parquet"),
         help="Current parquet (production / newer window).",
     )
     parser.add_argument(
-        "--sample", type=int, default=DEFAULT_SAMPLE_SIZE,
+        "--sample",
+        type=int,
+        default=DEFAULT_SAMPLE_SIZE,
         help="Max rows per side (0 = full).",
     )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
-        "--slack-webhook", type=str, default=os.getenv("SLACK_WEBHOOK_URL"),
+        "--slack-webhook",
+        type=str,
+        default=os.getenv("SLACK_WEBHOOK_URL"),
         help="Slack incoming webhook URL (fallback: $SLACK_WEBHOOK_URL).",
     )
     parser.add_argument(
-        "--share-threshold", type=float, default=0.3,
+        "--share-threshold",
+        type=float,
+        default=0.3,
         help="Notify Slack when share of drifted columns >= this (0..1).",
     )
     args = parser.parse_args()
 
     for p in (args.reference, args.current):
         if not p.exists():
-            logger.error(
-                "Missing %s — run `python ml/src/preprocess.py` first.", p
-            )
+            logger.error("Missing %s — run `python ml/src/preprocess.py` first.", p)
             return 1
 
     run(
-        args.reference, args.current, args.sample, args.seed,
+        args.reference,
+        args.current,
+        args.sample,
+        args.seed,
         slack_webhook=args.slack_webhook,
         share_threshold=args.share_threshold,
     )

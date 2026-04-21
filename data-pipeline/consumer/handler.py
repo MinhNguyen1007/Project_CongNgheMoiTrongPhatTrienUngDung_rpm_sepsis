@@ -4,12 +4,13 @@ Usage:
     python data-pipeline/consumer/handler.py
 """
 
+import contextlib
 import json
 import logging
 import math
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import boto3
@@ -118,9 +119,7 @@ class KinesisConsumer:
 
         while True:
             try:
-                resp = self.kinesis.get_records(
-                    ShardIterator=shard_iterator, Limit=100
-                )
+                resp = self.kinesis.get_records(ShardIterator=shard_iterator, Limit=100)
                 records = resp["Records"]
 
                 if records:
@@ -201,7 +200,7 @@ class KinesisConsumer:
         """Upsert latest features into DynamoDB."""
         item: dict = {
             "patient_id": patient_id,
-            "last_updated": datetime.now(timezone.utc).isoformat(),
+            "last_updated": datetime.now(UTC).isoformat(),
         }
         for k, v in features.items():
             if v is None:
@@ -216,13 +215,11 @@ class KinesisConsumer:
         iculos_raw = record.get("ICULOS")
         iculos = 0
         if iculos_raw is not None:
-            try:
+            with contextlib.suppress(TypeError, ValueError):
                 iculos = max(0, int(float(iculos_raw)))
-            except (TypeError, ValueError):
-                pass
 
         entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "iculos_hours": iculos,
         }
         for vk in VITAL_KEYS_FOR_STORAGE:
@@ -240,9 +237,7 @@ class KinesisConsumer:
         if len(self._raw_buffer) >= self._buffer_flush_size:
             self._flush_raw_buffer()
 
-    def _post_prediction(
-        self, patient_id: str, record: dict, features: dict
-    ) -> None:
+    def _post_prediction(self, patient_id: str, record: dict, features: dict) -> None:
         """POST features to backend /predict. Failures are logged but non-fatal."""
         if self._http is None:
             return
@@ -295,7 +290,7 @@ class KinesisConsumer:
     def _flush_raw_buffer(self) -> None:
         if not self._raw_buffer:
             return
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         key = (
             f"vitals/year={now.year}/month={now.month:02d}/day={now.day:02d}/"
             f"{now.strftime('%H%M%S')}_{len(self._raw_buffer)}.json"
@@ -308,7 +303,9 @@ class KinesisConsumer:
         )
         logger.info(
             "Flushed %d records -> s3://%s/%s",
-            len(self._raw_buffer), S3_RAW_BUCKET, key,
+            len(self._raw_buffer),
+            S3_RAW_BUCKET,
+            key,
         )
         self._raw_buffer.clear()
 

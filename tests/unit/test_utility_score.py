@@ -12,7 +12,7 @@ import pytest
 
 pytest.importorskip("pandas")
 
-from ml.src.utility_score import (  # noqa: E402
+from ml.src.utility_score import (
     DT_EARLY,
     DT_LATE,
     DT_OPTIMAL,

@@ -25,9 +25,7 @@ from pathlib import Path
 
 import pandas as pd
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 LABEL_COL = "SepsisLabel"
@@ -43,9 +41,7 @@ def relabel_split(df: pd.DataFrame, late_cutoff: int = 3) -> pd.DataFrame:
     Non-sepsis patients (no positive rows) are untouched.
     """
     if TIME_COL not in df.columns:
-        raise KeyError(
-            f"{TIME_COL} column missing — required to compute onset time."
-        )
+        raise KeyError(f"{TIME_COL} column missing — required to compute onset time.")
 
     df = df.sort_values([PATIENT_COL, TIME_COL]).reset_index(drop=True)
     new_label = df[LABEL_COL].to_numpy().copy()
@@ -53,7 +49,7 @@ def relabel_split(df: pd.DataFrame, late_cutoff: int = 3) -> pd.DataFrame:
     patients_modified = 0
     rows_flipped = 0
 
-    for pid, group in df.groupby(PATIENT_COL, sort=False):
+    for _pid, group in df.groupby(PATIENT_COL, sort=False):
         if group[LABEL_COL].max() != 1:
             continue
 
@@ -84,27 +80,33 @@ def relabel_split(df: pd.DataFrame, late_cutoff: int = 3) -> pd.DataFrame:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Relabel training features")
     parser.add_argument(
-        "--input-dir", type=Path, default=Path("data/features"),
+        "--input-dir",
+        type=Path,
+        default=Path("data/features"),
         help="Directory with train/val/test parquet files (from build_features.py).",
     )
     parser.add_argument(
-        "--out-dir", type=Path, default=Path("data/features_relabeled"),
+        "--out-dir",
+        type=Path,
+        default=Path("data/features_relabeled"),
         help="Destination directory for relabeled splits.",
     )
     parser.add_argument(
-        "--late-cutoff", type=int, default=3,
+        "--late-cutoff",
+        type=int,
+        default=3,
         help="Hours after onset to keep SepsisLabel=1. Rows beyond are flipped to 0.",
     )
     parser.add_argument(
-        "--splits", nargs="+", default=["train"],
+        "--splits",
+        nargs="+",
+        default=["train"],
         help="Splits to relabel. Never include 'test' — would break utility eval.",
     )
     args = parser.parse_args()
 
     if "test" in args.splits:
-        raise ValueError(
-            "Refusing to relabel test split — it would invalidate utility evaluation."
-        )
+        raise ValueError("Refusing to relabel test split — it would invalidate utility evaluation.")
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
 

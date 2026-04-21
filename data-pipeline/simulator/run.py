@@ -86,7 +86,9 @@ def run_simulation(data_dir: Path, max_patients: int, speed: float) -> None:
     max_hours = max(len(df) for df in patients.values())
     logger.info(
         "Starting simulation: %d patients, %d max hours, %.1fs/hour",
-        len(patients), max_hours, speed,
+        len(patients),
+        max_hours,
+        speed,
     )
 
     records_sent = 0
@@ -106,7 +108,13 @@ def run_simulation(data_dir: Path, max_patients: int, speed: float) -> None:
             batch_count += 1
             records_sent += 1
 
-        logger.info("Hour %d/%d — sent %d records (total: %d)", hour + 1, max_hours, batch_count, records_sent)
+        logger.info(
+            "Hour %d/%d — sent %d records (total: %d)",
+            hour + 1,
+            max_hours,
+            batch_count,
+            records_sent,
+        )
 
         if hour < max_hours - 1:
             time.sleep(speed)
@@ -117,15 +125,21 @@ def run_simulation(data_dir: Path, max_patients: int, speed: float) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Replay PhysioNet data into Kinesis")
     parser.add_argument(
-        "--data-dir", type=Path, default=Path("data/raw"),
+        "--data-dir",
+        type=Path,
+        default=Path("data/raw"),
         help="Directory containing .psv files (default: data/raw)",
     )
     parser.add_argument(
-        "--patients", type=int, default=10,
+        "--patients",
+        type=int,
+        default=10,
         help="Number of patients to simulate (default: 10)",
     )
     parser.add_argument(
-        "--speed", type=float, default=1.0,
+        "--speed",
+        type=float,
+        default=1.0,
         help="Seconds per simulated hour (default: 1.0)",
     )
     args = parser.parse_args()

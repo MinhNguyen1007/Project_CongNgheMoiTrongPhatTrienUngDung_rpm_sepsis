@@ -21,9 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "data-pip
 from consumer.feature_engineer import FeatureEngineer
 from feature_store.schemas import FEATURE_NAMES
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -43,8 +41,7 @@ def build_features_for_split(df: pd.DataFrame) -> pd.DataFrame:
             record = row.to_dict()
             # NaN -> None (FeatureEngineer expects None for missing)
             record = {
-                k: (None if isinstance(v, float) and np.isnan(v) else v)
-                for k, v in record.items()
+                k: (None if isinstance(v, float) and np.isnan(v) else v) for k, v in record.items()
             }
 
             features = engineer.update(pid, record)
@@ -61,15 +58,13 @@ def build_features_for_split(df: pd.DataFrame) -> pd.DataFrame:
             logger.info("  Processed %d / %d patients", i + 1, len(patient_ids))
 
     result_df = pd.DataFrame(results)
-    logger.info(
-        "Built features: %d rows, %d columns", len(result_df), len(result_df.columns)
-    )
+    logger.info("Built features: %d rows, %d columns", len(result_df), len(result_df.columns))
     return result_df
 
 
 def get_model_feature_columns() -> list[str]:
     """Return the 131 feature names + 3 demographics used as model input."""
-    return FEATURE_NAMES + ["Age", "Gender", "HospAdmTime"]
+    return [*FEATURE_NAMES, "Age", "Gender", "HospAdmTime"]
 
 
 def main() -> None:

@@ -11,9 +11,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 SPLIT_RATIOS = (0.70, 0.15, 0.15)  # train / val / test
@@ -36,9 +34,7 @@ def load_single_patient(psv_path: Path) -> pd.DataFrame:
     return df
 
 
-def load_all_patients(
-    data_dir: Path, max_patients: int | None = None
-) -> pd.DataFrame:
+def load_all_patients(data_dir: Path, max_patients: int | None = None) -> pd.DataFrame:
     """Load all .psv files into one DataFrame."""
     psv_files = discover_psv_files(data_dir)
     if max_patients:

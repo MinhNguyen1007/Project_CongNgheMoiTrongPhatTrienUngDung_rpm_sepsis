@@ -53,7 +53,7 @@ Biểu đồ hoạt động (Hình 2.3, file `docs/uml/03-activity-sepsis-detect
 
 Luồng bắt đầu bằng việc xác thực dữ liệu. Nếu giá trị rơi ngoài khoảng sinh lý hợp lệ (ví dụ `HR = 0` hoặc `Temp > 45°C`), quan sát bị loại bỏ và ghi log cho việc debug về sau. Dữ liệu hợp lệ được ghi vào S3 dưới dạng Parquet (cho huấn luyện sau này) và cập nhật vào DynamoDB để làm đặc trưng real-time.
 
-Chỉ khi bệnh nhân đã tích luỹ đủ sáu giờ dữ liệu, hệ thống mới gọi suy luận. Điều này tránh việc đưa ra dự đoán không tin cậy cho những bệnh nhân mới nhập ICU có quá ít dữ liệu. Khi xác suất vượt ngưỡng cảnh báo (mặc định 0,5), hệ thống kiểm tra xem đã có cảnh báo nào cho cùng bệnh nhân trong một giờ qua chưa: nếu có thì chỉ cập nhật, nếu chưa thì tạo cảnh báo mới và đẩy thông báo WebSocket. Cơ chế này (gọi là *alert hysteresis*) giúp tránh gửi nhiều cảnh báo trùng lặp khi xác suất dao động quanh ngưỡng, là vấn đề kinh điển gây "mệt mỏi cảnh báo" (alert fatigue) cho bác sĩ.
+Chỉ khi bệnh nhân đã tích luỹ đủ sáu giờ dữ liệu, hệ thống mới gọi suy luận. Điều này tránh việc đưa ra dự đoán không tin cậy cho những bệnh nhân mới nhập ICU có quá ít dữ liệu. Khi xác suất vượt ngưỡng cảnh báo (mặc định 0,5), hệ thống kiểm tra xem đã có cảnh báo nào cho cùng bệnh nhân trong một giờ qua chưa: nếu có thì chỉ cập nhật, nếu chưa thì tạo cảnh báo mới và đẩy thông báo WebSocket. Cơ chế này (gọi là _alert hysteresis_) giúp tránh gửi nhiều cảnh báo trùng lặp khi xác suất dao động quanh ngưỡng, là vấn đề kinh điển gây "mệt mỏi cảnh báo" (alert fatigue) cho bác sĩ.
 
 Với các trường hợp xác suất ở mức nghiêm trọng (≥ 0,7), ngoài WebSocket, hệ thống còn gửi Slack webhook để nhắn tin cho nhóm trực, đảm bảo không ai bỏ sót cảnh báo quan trọng ngay cả khi không đang nhìn màn hình.
 

@@ -35,11 +35,32 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 VITAL_COLUMNS = ["HR", "O2Sat", "Temp", "SBP", "MAP", "DBP", "Resp", "EtCO2"]
 
 LAB_COLUMNS = [
-    "BaseExcess", "HCO3", "FiO2", "pH", "PaCO2", "SaO2",
-    "AST", "BUN", "Alkalinephos", "Calcium", "Chloride",
-    "Creatinine", "Bilirubin_direct", "Glucose", "Lactate",
-    "Magnesium", "Phosphate", "Potassium", "Bilirubin_total",
-    "TroponinI", "Hct", "Hgb", "PTT", "WBC", "Fibrinogen", "Platelets",
+    "BaseExcess",
+    "HCO3",
+    "FiO2",
+    "pH",
+    "PaCO2",
+    "SaO2",
+    "AST",
+    "BUN",
+    "Alkalinephos",
+    "Calcium",
+    "Chloride",
+    "Creatinine",
+    "Bilirubin_direct",
+    "Glucose",
+    "Lactate",
+    "Magnesium",
+    "Phosphate",
+    "Potassium",
+    "Bilirubin_total",
+    "TroponinI",
+    "Hct",
+    "Hgb",
+    "PTT",
+    "WBC",
+    "Fibrinogen",
+    "Platelets",
 ]
 
 DEMOGRAPHIC_COLUMNS = ["Age", "Gender", "Unit1", "Unit2", "HospAdmTime"]

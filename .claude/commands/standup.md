@@ -24,21 +24,26 @@ Tạo báo cáo standup hàng tuần cho thành viên `$ARGUMENTS` (hoặc toàn
 ## Người: [tên hoặc "cả nhóm"]
 
 ### Đã xong tuần trước
+
 - [commit + ý nghĩa]
 - ...
 
 ### Đang làm
+
 - [WIP branch + tiến độ %]
 - ...
 
 ### Kế hoạch tuần tới
+
 - [task theo roadmap]
 - ...
 
 ### Blocker
+
 - [nếu có, kèm người giúp]
 
 ### Ghi chú cho nhóm
+
 - [PR cần review, quyết định cần vote, v.v.]
 ```
 

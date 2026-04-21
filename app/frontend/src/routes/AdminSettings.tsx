@@ -14,7 +14,12 @@ export function AdminSettings() {
   const queryClient = useQueryClient();
   const currentUser = useAuthStore((s) => s.username);
 
-  const { data: users = [], isLoading, isError, error } = useQuery({
+  const {
+    data: users = [],
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
     queryKey: ["users"],
     queryFn: api.listUsers,
   });
@@ -30,16 +35,25 @@ export function AdminSettings() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, patch }: { id: number; patch: Parameters<typeof api.updateUser>[1] }) =>
-      api.updateUser(id, patch),
+    mutationFn: ({
+      id,
+      patch,
+    }: {
+      id: number;
+      patch: Parameters<typeof api.updateUser>[1];
+    }) => api.updateUser(id, patch),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["users"] }),
   });
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-slate-800">Quản trị người dùng</h2>
-        <span className="text-xs text-slate-500">Chỉ admin truy cập được trang này.</span>
+        <h2 className="text-lg font-semibold text-slate-800">
+          Quản trị người dùng
+        </h2>
+        <span className="text-xs text-slate-500">
+          Chỉ admin truy cập được trang này.
+        </span>
       </div>
 
       <CreateUserForm
@@ -88,7 +102,8 @@ export function AdminSettings() {
                     })
                   }
                   onDelete={() => {
-                    if (confirm(`Xoá user "${u.username}"?`)) deleteMutation.mutate(u.id);
+                    if (confirm(`Xoá user "${u.username}"?`))
+                      deleteMutation.mutate(u.id);
                   }}
                   busy={updateMutation.isPending || deleteMutation.isPending}
                 />
@@ -193,7 +208,14 @@ interface UserRowProps {
   onDelete: () => void;
 }
 
-function UserRow({ user, isSelf, busy, onChangeRole, onToggleActive, onDelete }: UserRowProps) {
+function UserRow({
+  user,
+  isSelf,
+  busy,
+  onChangeRole,
+  onToggleActive,
+  onDelete,
+}: UserRowProps) {
   return (
     <tr className="border-t border-slate-100">
       <td className="px-4 py-2 text-slate-500">{user.id}</td>

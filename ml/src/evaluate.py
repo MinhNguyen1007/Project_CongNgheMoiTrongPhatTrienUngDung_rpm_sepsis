@@ -35,9 +35,8 @@ load_dotenv()  # pick up MLFLOW_S3_ENDPOINT_URL + AWS creds from .env
 # MLflow artifact store = MinIO, not LocalStack. Override with MinIO credentials
 # so boto3 can authenticate when downloading/uploading to s3://mlflow/.
 os.environ["AWS_ACCESS_KEY_ID"] = os.environ.get("MINIO_ROOT_USER", "minioadmin")
-os.environ["AWS_SECRET_ACCESS_KEY"] = os.environ.get(
-    "MINIO_ROOT_PASSWORD", "minioadmin123"
-)
+os.environ["AWS_SECRET_ACCESS_KEY"] = os.environ.get("MINIO_ROOT_PASSWORD", "minioadmin123")
+from build_features import get_model_feature_columns
 from sklearn.metrics import (
     average_precision_score,
     confusion_matrix,
@@ -45,13 +44,9 @@ from sklearn.metrics import (
     roc_auc_score,
     roc_curve,
 )
-
-from build_features import get_model_feature_columns
 from utility_score import compute_normalized_utility
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 LABEL_COL = "SepsisLabel"
@@ -140,7 +135,10 @@ def resolve_decision_params(
             warmup = int(payload.get("warmup_hours", 0))
         logger.info(
             "Loaded decision params from run %s: thr=%.3f k=%d warmup=%dh",
-            run_id, threshold, consecutive, warmup,
+            run_id,
+            threshold,
+            consecutive,
+            warmup,
         )
     except Exception as exc:
         logger.warning("Could not load decision params (%s)", exc)
@@ -199,11 +197,7 @@ def compute_per_patient_results(
         has_alarm = t_alarm is not None
 
         t_onset = int(np.argmax(labels == 1)) if is_sepsis else None
-        ahead_h = (
-            (t_onset - t_alarm)
-            if (is_sepsis and has_alarm and t_alarm <= t_onset)
-            else None
-        )
+        ahead_h = (t_onset - t_alarm) if (is_sepsis and has_alarm and t_alarm <= t_onset) else None
 
         rows.append(
             {
@@ -265,9 +259,9 @@ def compute_shap(
         shap_values = shap_values[1]
 
     mean_abs = np.abs(shap_values).mean(axis=0)
-    importance = pd.DataFrame(
-        {"feature": feature_cols, "mean_abs_shap": mean_abs}
-    ).sort_values("mean_abs_shap", ascending=False)
+    importance = pd.DataFrame({"feature": feature_cols, "mean_abs_shap": mean_abs}).sort_values(
+        "mean_abs_shap", ascending=False
+    )
     importance.to_csv(out_dir / "shap_importance.csv", index=False)
 
     plt.figure()
@@ -347,7 +341,9 @@ def main() -> None:
     )
     logger.info(
         "Using threshold=%.4f  min_consecutive=%d  warmup=%dh",
-        threshold, min_consec, warmup,
+        threshold,
+        min_consec,
+        warmup,
     )
 
     with mlflow.start_run() as run:
@@ -372,7 +368,10 @@ def main() -> None:
         pred_df = test_df[[PATIENT_COL, LABEL_COL]].copy()
         pred_df["prediction"] = y_pred
         util = compute_normalized_utility(
-            pred_df, "prediction", LABEL_COL, PATIENT_COL,
+            pred_df,
+            "prediction",
+            LABEL_COL,
+            PATIENT_COL,
             min_consecutive=min_consec,
             warmup_hours=warmup,
         )
@@ -389,23 +388,19 @@ def main() -> None:
         art_dir = Path("artifacts") / f"eval_{run.info.run_id[:8]}"
         art_dir.mkdir(parents=True, exist_ok=True)
 
-        per_patient = compute_per_patient_results(
-            test_df, y_proba, threshold, min_consec, warmup
-        )
+        per_patient = compute_per_patient_results(test_df, y_proba, threshold, min_consec, warmup)
         per_patient.to_csv(art_dir / "per_patient_results.csv", index=False)
 
         ahead = per_patient["alert_ahead_h"].dropna().to_numpy()
         if len(ahead) > 0:
             mlflow.log_metric("test_alert_ahead_mean_h", float(np.mean(ahead)))
             mlflow.log_metric("test_alert_ahead_median_h", float(np.median(ahead)))
-            mlflow.log_metric("test_alert_ahead_n_patients", int(len(ahead)))
+            mlflow.log_metric("test_alert_ahead_n_patients", len(ahead))
 
         plot_roc_pr(y_test, y_proba, auroc, auprc, art_dir / "roc_pr_curves.png")
 
         logger.info("Computing SHAP (%d samples)...", args.shap_samples)
-        shap_imp = compute_shap(
-            model, X_test, feature_cols, args.shap_samples, art_dir
-        )
+        shap_imp = compute_shap(model, X_test, feature_cols, args.shap_samples, art_dir)
 
         summary = {
             "model_uri": args.model_uri,
@@ -418,11 +413,16 @@ def main() -> None:
             "normalized_utility": float(util["normalized_utility"]),
             "raw_utility": float(util["raw_utility"]),
             "confusion_matrix": {
-                "tn": int(tn), "fp": int(fp), "fn": int(fn), "tp": int(tp),
+                "tn": int(tn),
+                "fp": int(fp),
+                "fn": int(fn),
+                "tp": int(tp),
             },
             "patient_counts": {
-                "tp": int(util["tp"]), "fn": int(util["fn"]),
-                "fp": int(util["fp"]), "tn": int(util["tn"]),
+                "tp": int(util["tp"]),
+                "fn": int(util["fn"]),
+                "fp": int(util["fp"]),
+                "tn": int(util["tn"]),
             },
             "alert_ahead_mean_h": float(np.mean(ahead)) if len(ahead) > 0 else None,
             "alert_ahead_median_h": float(np.median(ahead)) if len(ahead) > 0 else None,

@@ -45,9 +45,11 @@ MCP config load khi Claude Code khởi động. Sau khi sửa `mcp.json`, restar
 ### 4. Verify
 
 Trong Claude Code:
+
 ```
 /mcp list
 ```
+
 Phải thấy các server status `connected`.
 
 ## Security
@@ -59,12 +61,12 @@ Phải thấy các server status `connected`.
 
 ## Troubleshooting
 
-| Lỗi                                        | Nguyên nhân                              | Fix                                     |
-|--------------------------------------------|------------------------------------------|-----------------------------------------|
-| `MCP server 'github' failed to start`      | PAT sai hoặc hết hạn                     | Gen PAT mới                             |
-| `ECONNREFUSED postgres:5432`               | Postgres container chưa chạy             | `docker-compose up -d postgres`         |
-| `npx command not found`                    | Node chưa cài                            | Cài Node 20 LTS                         |
-| `Permission denied: .claude/mcp.json`      | File bị track git + readonly             | `chmod 600 .claude/mcp.json`            |
+| Lỗi                                   | Nguyên nhân                  | Fix                             |
+| ------------------------------------- | ---------------------------- | ------------------------------- |
+| `MCP server 'github' failed to start` | PAT sai hoặc hết hạn         | Gen PAT mới                     |
+| `ECONNREFUSED postgres:5432`          | Postgres container chưa chạy | `docker-compose up -d postgres` |
+| `npx command not found`               | Node chưa cài                | Cài Node 20 LTS                 |
+| `Permission denied: .claude/mcp.json` | File bị track git + readonly | `chmod 600 .claude/mcp.json`    |
 
 ## Alternative MCP servers đáng thử
 

@@ -68,12 +68,15 @@ Dự án setup đầy đủ để cả nhóm dùng Claude Code hiệu quả. **M
 ### Cách dùng
 
 **Skills** — gọi trong session Claude Code:
+
 > "Tạo component mới PatientVitalCard" → Claude tự invoke skill `new-component`.
 
 **Subagents** — gọi để chuyên sâu:
+
 > "Spawn medical-reviewer để check file ml/src/features.py" → tạo subagent với context riêng.
 
 **Slash commands** — gõ trong chat:
+
 - `/standup nguyen-a` — tạo báo cáo tuần cho thành viên A
 - `/train ml/configs/lgbm-v3.yaml` — chạy training
 - `/deploy-local` — khởi động toàn bộ stack + health check
@@ -83,6 +86,7 @@ Dự án setup đầy đủ để cả nhóm dùng Claude Code hiệu quả. **M
 - `/check-quality` — chạy full lint+test trước PR
 
 **Hooks** — tự chạy (đã cấu hình):
+
 - Sau mỗi Edit/Write file `.py/.ts/.tsx` → tự format bằng ruff/prettier.
 - Cuối session → nhắc update docs nếu kiến trúc đổi.
 

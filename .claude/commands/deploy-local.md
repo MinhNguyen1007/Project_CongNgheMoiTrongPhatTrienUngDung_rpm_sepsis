@@ -14,17 +14,17 @@ Khởi động đầy đủ hệ thống local và kiểm tra health của từn
 3. Đợi 15-30s cho service khởi động. Hiển thị log khởi tạo cuối.
 4. Verify sequence (mỗi service test riêng):
 
-| Service              | Health check command                                              |
-|----------------------|-------------------------------------------------------------------|
-| LocalStack           | `curl -sf http://localhost:4566/_localstack/health`               |
-| MLflow               | `curl -sf http://localhost:5000`                                  |
-| MinIO                | `curl -sf http://localhost:9000/minio/health/live`                |
-| PostgreSQL           | `docker exec postgres pg_isready`                                 |
-| Redis                | `docker exec redis redis-cli ping`                                |
-| FastAPI              | `curl -sf http://localhost:8000/health`                           |
-| Frontend             | `curl -sf http://localhost:5173`                                  |
-| Prometheus           | `curl -sf http://localhost:9090/-/healthy`                        |
-| Grafana              | `curl -sf http://localhost:3000/api/health`                       |
+| Service    | Health check command                                |
+| ---------- | --------------------------------------------------- |
+| LocalStack | `curl -sf http://localhost:4566/_localstack/health` |
+| MLflow     | `curl -sf http://localhost:5000`                    |
+| MinIO      | `curl -sf http://localhost:9000/minio/health/live`  |
+| PostgreSQL | `docker exec postgres pg_isready`                   |
+| Redis      | `docker exec redis redis-cli ping`                  |
+| FastAPI    | `curl -sf http://localhost:8000/health`             |
+| Frontend   | `curl -sf http://localhost:5173`                    |
+| Prometheus | `curl -sf http://localhost:9090/-/healthy`          |
+| Grafana    | `curl -sf http://localhost:3000/api/health`         |
 
 5. Init LocalStack resources nếu cần: chạy `bash infra/localstack/init.sh`.
 6. Tóm tắt bảng trạng thái + URL truy cập.

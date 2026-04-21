@@ -6,7 +6,7 @@ import pytest
 
 pytest.importorskip("passlib")
 
-from app.backend.auth import hash_password, verify_password  # noqa: E402
+from app.backend.auth import hash_password, verify_password
 
 
 def test_hash_is_not_plaintext():

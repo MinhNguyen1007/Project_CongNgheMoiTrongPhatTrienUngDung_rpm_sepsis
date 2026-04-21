@@ -33,17 +33,12 @@ load_dotenv()  # pick up MLFLOW_S3_ENDPOINT_URL + AWS creds from .env
 # MLflow artifact store = MinIO, not LocalStack. Override with MinIO credentials
 # so boto3 can authenticate when uploading to s3://mlflow/.
 os.environ["AWS_ACCESS_KEY_ID"] = os.environ.get("MINIO_ROOT_USER", "minioadmin")
-os.environ["AWS_SECRET_ACCESS_KEY"] = os.environ.get(
-    "MINIO_ROOT_PASSWORD", "minioadmin123"
-)
-from sklearn.metrics import average_precision_score, roc_auc_score
-
+os.environ["AWS_SECRET_ACCESS_KEY"] = os.environ.get("MINIO_ROOT_PASSWORD", "minioadmin123")
 from build_features import get_model_feature_columns
+from sklearn.metrics import average_precision_score, roc_auc_score
 from utility_score import compute_normalized_utility
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 LABEL_COL = "SepsisLabel"
@@ -77,15 +72,11 @@ DEFAULT_PARAMS: dict = {
 def load_split(features_dir: Path, split: str) -> pd.DataFrame:
     path = features_dir / f"{split}.parquet"
     if not path.exists():
-        raise FileNotFoundError(
-            f"{path} not found. Run preprocess.py and build_features.py first."
-        )
+        raise FileNotFoundError(f"{path} not found. Run preprocess.py and build_features.py first.")
     return pd.read_parquet(path)
 
 
-def prepare_xy(
-    df: pd.DataFrame, feature_cols: list[str]
-) -> tuple[pd.DataFrame, np.ndarray]:
+def prepare_xy(df: pd.DataFrame, feature_cols: list[str]) -> tuple[pd.DataFrame, np.ndarray]:
     """Coerce feature columns to numeric (None -> NaN — LightGBM handles NaN)."""
     X = df[feature_cols].apply(pd.to_numeric, errors="coerce")
     y = df[LABEL_COL].astype(int).to_numpy()
@@ -229,9 +220,7 @@ def main() -> None:
     X_val, y_val = prepare_xy(val_df, feature_cols)
 
     train_ds = lgb.Dataset(X_train, label=y_train, feature_name=feature_cols)
-    val_ds = lgb.Dataset(
-        X_val, label=y_val, reference=train_ds, feature_name=feature_cols
-    )
+    val_ds = lgb.Dataset(X_val, label=y_val, reference=train_ds, feature_name=feature_cols)
 
     params = {**DEFAULT_PARAMS, "seed": args.seed}
 
@@ -284,9 +273,7 @@ def main() -> None:
         art_dir = Path("artifacts") / f"train_{run.info.run_id[:8]}"
         art_dir.mkdir(parents=True, exist_ok=True)
 
-        pd.DataFrame(grid_results).to_csv(
-            art_dir / "threshold_grid.csv", index=False
-        )
+        pd.DataFrame(grid_results).to_csv(art_dir / "threshold_grid.csv", index=False)
         (art_dir / "best_threshold.json").write_text(
             json.dumps(
                 {
@@ -298,9 +285,7 @@ def main() -> None:
                 indent=2,
             )
         )
-        (art_dir / "feature_cols.json").write_text(
-            json.dumps(feature_cols, indent=2)
-        )
+        (art_dir / "feature_cols.json").write_text(json.dumps(feature_cols, indent=2))
 
         importance = pd.DataFrame(
             {
@@ -335,9 +320,7 @@ def main() -> None:
             best_k,
             best_warmup,
         )
-        logger.info(
-            "Top-5 features by gain:\n%s", importance.head(5).to_string(index=False)
-        )
+        logger.info("Top-5 features by gain:\n%s", importance.head(5).to_string(index=False))
         logger.info("=" * 60)
         logger.info(
             "To evaluate: python ml/src/evaluate.py "
