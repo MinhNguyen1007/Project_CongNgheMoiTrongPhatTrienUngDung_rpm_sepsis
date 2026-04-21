@@ -1,73 +1,61 @@
-# React + TypeScript + Vite
+# Frontend — Sepsis Monitoring Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+> 5 màn real-time + RBAC cho hệ thống giám sát ICU. Stack: React 19 + Vite 8 + TypeScript 6 strict + TailwindCSS 4 + Zustand + TanStack Query + React Router 6 + Recharts.
 
-Currently, two official plugins are available:
+Đồng nghiệp mới: đọc [README root](../../README.md) trước để setup cả hệ thống, rồi quay lại đây.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Dev
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(["dist"]),
-  {
-    files: ["**/*.{ts,tsx}"],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ["./tsconfig.node.json", "./tsconfig.app.json"],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-]);
+```bash
+npm ci                  # lần đầu
+npm run dev             # :5173, hot reload, proxy /api → backend :8000
+npm run build           # tsc -b && vite build → dist/
+npm run lint            # ESLint + TypeScript strict
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Cấu trúc
 
-```js
-// eslint.config.js
-import reactX from "eslint-plugin-react-x";
-import reactDom from "eslint-plugin-react-dom";
-
-export default defineConfig([
-  globalIgnores(["dist"]),
-  {
-    files: ["**/*.{ts,tsx}"],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs["recommended-typescript"],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ["./tsconfig.node.json", "./tsconfig.app.json"],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-]);
 ```
+src/
+├── api/client.ts        # fetch + bearer token injection + auto-logout 401
+├── hooks/useAlertStream.ts  # WebSocket /ws/alerts auto-reconnect 2s
+├── stores/
+│   ├── authStore.ts     # Zustand + localStorage persist (rpm_auth key)
+│   └── patientsStore.ts # Zustand (WS secondary; server polling primary)
+├── routes/
+│   ├── Login.tsx        # dark glassmorphism, gradient submit
+│   ├── PatientList.tsx  # TanStack Query polling 5s, ALARM pulse
+│   ├── PatientDetail.tsx # 3 chart: proba timeline, vitals, temp (tách scale 35-41°C)
+│   ├── AlertsFeed.tsx   # dual-tab Live (WS) + History (DB + acknowledge)
+│   └── AdminSettings.tsx # CRUD users (admin-only, RoleGate guard)
+├── components/
+│   ├── AppLayout.tsx    # nav + user badge + logout
+│   ├── ProtectedRoute.tsx # redirect /login nếu !isAuthenticated
+│   └── RoleGate.tsx     # ẩn UI theo role
+└── types/api.ts         # mirror backend schemas
+```
+
+## Pitfalls đã gặp (đọc trước khi code để tránh)
+
+- **Zustand selector trả collection** — KHÔNG viết `s => Object.values(s.patients)` (tạo array mới mỗi render → infinite loop → màn hình trắng). Subscribe ref stable `s => s.patients`, `Object.values(...)` ngoài (quyết định #26 CLAUDE.md).
+- **Tailwind 4** dùng `@tailwindcss/vite` plugin, KHÔNG có `tailwind.config.js` hay PostCSS. Chỉ `@import "tailwindcss";` trong `index.css` (quyết định #25).
+- **TypeScript tsconfig** dùng JSONC (có comment + trailing comma) → pre-commit `check-json` đã exclude 2 file này.
+
+## API proxy dev
+
+`vite.config.ts` đã set proxy:
+
+- `/api/*` → `http://localhost:8000/*`
+- `/ws/*` → `ws://localhost:8000/ws/*`
+
+Khi chạy `npm run dev`, frontend gọi `/api/predict` sẽ tự proxy sang backend — không cần CORS config.
+
+## Default login
+
+Seed tự động khi backend khởi động lần đầu:
+
+- Username: `admin`
+- Password: `admin123`
+- Role: `admin` (thấy được mọi thứ, có `/admin` route)
+
+Tạo user role khác qua UI `/admin` hoặc API `POST /auth/register`.
