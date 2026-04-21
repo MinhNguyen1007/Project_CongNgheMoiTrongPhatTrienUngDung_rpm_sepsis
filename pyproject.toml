@@ -31,7 +31,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]                # allow assert in tests
+"tests/**" = ["S101", "E402"]        # allow assert + late imports (pytest.importorskip guard)
 "ml/notebooks/**" = ["E402", "F401"] # notebook conventions
 "ml/src/train_lgbm.py" = ["E402"]    # MinIO env must be set before sklearn/boto3 import
 "ml/src/evaluate.py"   = ["E402"]

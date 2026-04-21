@@ -6,6 +6,7 @@ repos:
       - id: end-of-file-fixer
       - id: check-yaml
       - id: check-json
+        exclude: ^app/frontend/tsconfig.*\.json$ # TS uses JSONC (comments/trailing commas)
       - id: check-added-large-files
         args: ["--maxkb=1000"]
       - id: check-merge-conflict
@@ -26,8 +27,9 @@ repos:
           - pydantic
           - types-requests
           - types-PyYAML
+          - types-redis
         args: [--ignore-missing-imports, --no-strict-optional]
-        files: ^(ml|app/backend|data-pipeline)/.*\.py$
+        files: ^(ml|app/backend)/.*\.py$ # exclude data-pipeline (hyphen not a valid package name; resolved via sys.path at runtime)
 
   - repo: https://github.com/PyCQA/bandit
     rev: 1.7.10

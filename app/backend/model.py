@@ -115,5 +115,5 @@ def load_bundle() -> ModelBundle:
 def predict_proba(bundle: ModelBundle, features: dict[str, float]) -> float:
     row = {c: features.get(c, np.nan) for c in bundle.feature_cols}
     df = pd.DataFrame([row], columns=bundle.feature_cols).apply(pd.to_numeric, errors="coerce")
-    proba = bundle.model.predict(df)
+    proba = bundle.model.predict(df)  # type: ignore[attr-defined]  # MLflow pyfunc returns `object`
     return float(np.asarray(proba).ravel()[0])

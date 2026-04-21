@@ -55,7 +55,7 @@ def _post_slack(webhook: str, text: str) -> None:
             data=json.dumps({"text": text}).encode("utf-8"),
             headers={"Content-Type": "application/json"},
         )
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with urllib.request.urlopen(req, timeout=5) as resp:  # nosec B310 — webhook URL from trusted env var SLACK_WEBHOOK_URL
             logger.info("Slack webhook returned %s", resp.status)
     except Exception as exc:
         # Deliberately swallow — the drift report is the primary output and
