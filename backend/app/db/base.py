@@ -7,6 +7,7 @@ WHY pool_size=10, max_overflow=20: 1 worker FastAPI + thread consumer + schedule
 + websocket cùng dùng pool. 10+20 đủ cho dev, AWS RDS free tier max 20 connection
 nên có thể giảm xuống 5+10 khi deploy.
 """
+
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator

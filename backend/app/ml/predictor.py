@@ -1,10 +1,10 @@
 """Predict 1 row → sepsis risk. Stateless wrapper quanh model + buffer."""
+
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
 
-import numpy as np
 import xgboost as xgb
 
 from backend.app.ml.features import (
@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class PredictionResult:
-    sepsis_risk: float        # raw probability [0, 1]
-    alert: bool               # risk >= threshold
+    sepsis_risk: float  # raw probability [0, 1]
+    alert: bool  # risk >= threshold
     model_version: str
     threshold: float
 

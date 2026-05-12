@@ -16,6 +16,7 @@ Schema message:
     "sepsis_label": 0
 }
 """
+
 from __future__ import annotations
 
 import argparse
@@ -76,14 +77,14 @@ def _connect_producer(bootstrap: str, retries: int = 30) -> KafkaProducer:
                 linger_ms=10,
             )
         except NoBrokersAvailable:
-            logger.warning("Kafka not ready (attempt %d/%d), retry in 2s...",
-                           attempt + 1, retries)
+            logger.warning("Kafka not ready (attempt %d/%d), retry in 2s...", attempt + 1, retries)
             time.sleep(2)
     raise RuntimeError(f"Cannot connect to Kafka at {bootstrap} after {retries} retries")
 
 
-def _load_patient_files(data_dir: Path, patients: list[str] | None,
-                        max_patients: int | None) -> list[Path]:
+def _load_patient_files(
+    data_dir: Path, patients: list[str] | None, max_patients: int | None
+) -> list[Path]:
     """Resolve list file PSV theo arg."""
     if patients:
         files = [data_dir / f"{pid}.psv" for pid in patients]
@@ -169,25 +170,34 @@ def stream_psv_files(
 def main() -> None:
     parser = argparse.ArgumentParser(description="PhysioNet → Kafka producer")
     parser.add_argument(
-        "--patients", nargs="*", default=None,
+        "--patients",
+        nargs="*",
+        default=None,
         help="Patient IDs cụ thể (vd: p000009 p000015). Mặc định: dùng --max-patients.",
     )
-    parser.add_argument("--max-patients", type=int, default=10,
-                        help="Số patient đầu để stream (nếu không truyền --patients).")
-    parser.add_argument("--rate", type=float, default=10.0,
-                        help="Messages/giây tổng (across all patients).")
-    parser.add_argument("--no-interleave", action="store_true",
-                        help="Stream tuần tự từng patient thay vì round-robin.")
-    parser.add_argument("--shuffle", action="store_true",
-                        help="Trộn ngẫu nhiên thứ tự patient.")
-    parser.add_argument("--data-dir", type=Path,
-                        default=PROJECT_ROOT / "ml" / "data" / "training_setA")
+    parser.add_argument(
+        "--max-patients",
+        type=int,
+        default=10,
+        help="Số patient đầu để stream (nếu không truyền --patients).",
+    )
+    parser.add_argument(
+        "--rate", type=float, default=10.0, help="Messages/giây tổng (across all patients)."
+    )
+    parser.add_argument(
+        "--no-interleave",
+        action="store_true",
+        help="Stream tuần tự từng patient thay vì round-robin.",
+    )
+    parser.add_argument("--shuffle", action="store_true", help="Trộn ngẫu nhiên thứ tự patient.")
+    parser.add_argument(
+        "--data-dir", type=Path, default=PROJECT_ROOT / "ml" / "data" / "training_setA"
+    )
     parser.add_argument("--bootstrap", type=str, default=settings.kafka_bootstrap_servers)
     parser.add_argument("--topic", type=str, default=settings.kafka_topic_vitals)
     args = parser.parse_args()
 
-    logging.basicConfig(level=logging.INFO,
-                        format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
     files = _load_patient_files(args.data_dir, args.patients, args.max_patients)
     logger.info("Will stream %d patient files from %s", len(files), args.data_dir)

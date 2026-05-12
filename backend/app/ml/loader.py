@@ -7,6 +7,7 @@ WHY alias thay vì stage: MLflow 2.9+ deprecate stage (xem `models:/.../@alias`)
 Khi retrain job promote version mới, alias `production` trỏ sang version mới
 → gọi `reload_model()` để swap cache.
 """
+
 from __future__ import annotations
 
 import logging
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class LoadedModel:
     """In-memory model + metadata. Immutable — reload swap whole struct."""
+
     booster: xgb.Booster
     feature_names: list[str]
     version: str  # MLflow version (vd: '1', '2', '3')
@@ -44,12 +46,9 @@ def _load_from_registry() -> LoadedModel:
     client = MlflowClient(tracking_uri=settings.mlflow_tracking_uri)
 
     # Resolve alias → version. URI dạng models:/<name>@<alias>.
-    mv = client.get_model_version_by_alias(
-        name=settings.model_name, alias=settings.model_alias
-    )
+    mv = client.get_model_version_by_alias(name=settings.model_name, alias=settings.model_alias)
     model_uri = f"models:/{settings.model_name}@{settings.model_alias}"
-    logger.info("Loading model %s (version=%s, run_id=%s)",
-                model_uri, mv.version, mv.run_id)
+    logger.info("Loading model %s (version=%s, run_id=%s)", model_uri, mv.version, mv.run_id)
 
     booster: xgb.Booster = mlflow.xgboost.load_model(model_uri)
     feature_names = list(booster.feature_names or [])

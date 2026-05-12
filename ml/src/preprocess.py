@@ -10,6 +10,7 @@ WHY rolling thay vì giá trị đơn lẻ: vital signs đo theo giờ, sepsis p
 qua xu hướng (HR tăng dần, BP tụt dần) hơn là 1 snapshot. Rolling 6h là
 trade-off giữa context và độ tươi.
 """
+
 from __future__ import annotations
 
 import logging
@@ -24,16 +25,44 @@ logger = logging.getLogger(__name__)
 
 # Tên 8 vital signs (đo theo giờ, ít NaN). Dùng cho rolling features.
 VITAL_COLS: list[str] = [
-    "HR", "O2Sat", "Temp", "SBP", "MAP", "DBP", "Resp", "EtCO2",
+    "HR",
+    "O2Sat",
+    "Temp",
+    "SBP",
+    "MAP",
+    "DBP",
+    "Resp",
+    "EtCO2",
 ]
 
 # 26 lab values — sampling thưa hơn, nhiều NaN. KHÔNG rolling, chỉ ffill.
 LAB_COLS: list[str] = [
-    "BaseExcess", "HCO3", "FiO2", "pH", "PaCO2", "SaO2",
-    "AST", "BUN", "Alkalinephos", "Calcium", "Chloride", "Creatinine",
-    "Bilirubin_direct", "Glucose", "Lactate", "Magnesium", "Phosphate",
-    "Potassium", "Bilirubin_total", "TroponinI", "Hct", "Hgb", "PTT",
-    "WBC", "Fibrinogen", "Platelets",
+    "BaseExcess",
+    "HCO3",
+    "FiO2",
+    "pH",
+    "PaCO2",
+    "SaO2",
+    "AST",
+    "BUN",
+    "Alkalinephos",
+    "Calcium",
+    "Chloride",
+    "Creatinine",
+    "Bilirubin_direct",
+    "Glucose",
+    "Lactate",
+    "Magnesium",
+    "Phosphate",
+    "Potassium",
+    "Bilirubin_total",
+    "TroponinI",
+    "Hct",
+    "Hgb",
+    "PTT",
+    "WBC",
+    "Fibrinogen",
+    "Platelets",
 ]
 
 # 6 cột demographics + admin (không phải feature theo thời gian).
@@ -169,7 +198,10 @@ def split_train_val(
 
     logger.info(
         "Split: train=%d rows (%d patients), val=%d rows (%d patients)",
-        len(train_df), len(train_pids), len(val_df), len(val_pids),
+        len(train_df),
+        len(train_pids),
+        len(val_df),
+        len(val_pids),
     )
     return train_df, val_df
 

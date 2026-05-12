@@ -6,6 +6,7 @@ isolate logic phân nhánh:
 - promoted vs not promoted → demote + reload hay không
 - subprocess rc != 0 → raise RuntimeError
 """
+
 from __future__ import annotations
 
 import json
@@ -40,13 +41,17 @@ async def test_drift_check_below_threshold_no_retrain(
 
     mock_subprocess.return_value = (
         0,
-        json.dumps({
-            "drift_share": 0.1,
-            "n_features": 30,
-            "n_drifted": 3,
-            "target_period": {"start": "2026-05-12T00:00:00+00:00",
-                              "end": "2026-05-12T01:00:00+00:00"},
-        }),
+        json.dumps(
+            {
+                "drift_share": 0.1,
+                "n_features": 30,
+                "n_drifted": 3,
+                "target_period": {
+                    "start": "2026-05-12T00:00:00+00:00",
+                    "end": "2026-05-12T01:00:00+00:00",
+                },
+            }
+        ),
         "",
     )
     session = AsyncMock()
@@ -75,13 +80,17 @@ async def test_drift_check_above_threshold_triggers_retrain(
 
     mock_subprocess.return_value = (
         0,
-        json.dumps({
-            "drift_share": 0.5,
-            "n_features": 30,
-            "n_drifted": 15,
-            "target_period": {"start": "2026-05-12T00:00:00+00:00",
-                              "end": "2026-05-12T01:00:00+00:00"},
-        }),
+        json.dumps(
+            {
+                "drift_share": 0.5,
+                "n_features": 30,
+                "n_drifted": 15,
+                "target_period": {
+                    "start": "2026-05-12T00:00:00+00:00",
+                    "end": "2026-05-12T01:00:00+00:00",
+                },
+            }
+        ),
         "",
     )
     session = AsyncMock()
@@ -127,18 +136,20 @@ async def test_retrain_promoted_demotes_and_reloads(
 
     mock_subprocess.return_value = (
         0,
-        json.dumps({
-            "reason": "manual",
-            "new_version": "4",
-            "new_run_id": "run123",
-            "new_auroc": 0.88,
-            "new_auprc": 0.15,
-            "new_utility": 0.85,
-            "new_threshold": 0.7,
-            "production_auroc_before": 0.84,
-            "promoted": True,
-            "n_db_rows_added": 1000,
-        }),
+        json.dumps(
+            {
+                "reason": "manual",
+                "new_version": "4",
+                "new_run_id": "run123",
+                "new_auroc": 0.88,
+                "new_auprc": 0.15,
+                "new_utility": 0.85,
+                "new_threshold": 0.7,
+                "production_auroc_before": 0.84,
+                "promoted": True,
+                "n_db_rows_added": 1000,
+            }
+        ),
         "",
     )
     session = AsyncMock()
@@ -173,18 +184,20 @@ async def test_retrain_not_promoted_skips_demote_and_reload(
 
     mock_subprocess.return_value = (
         0,
-        json.dumps({
-            "reason": "drift",
-            "new_version": "5",
-            "new_run_id": "run456",
-            "new_auroc": 0.80,
-            "new_auprc": 0.10,
-            "new_utility": 0.75,
-            "new_threshold": 0.7,
-            "production_auroc_before": 0.84,
-            "promoted": False,
-            "n_db_rows_added": 50,
-        }),
+        json.dumps(
+            {
+                "reason": "drift",
+                "new_version": "5",
+                "new_run_id": "run456",
+                "new_auroc": 0.80,
+                "new_auprc": 0.10,
+                "new_utility": 0.75,
+                "new_threshold": 0.7,
+                "production_auroc_before": 0.84,
+                "promoted": False,
+                "n_db_rows_added": 50,
+            }
+        ),
         "",
     )
     session = AsyncMock()

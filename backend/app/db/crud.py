@@ -2,9 +2,10 @@
 
 Quy tắc: function nhận session, KHÔNG tự commit (caller quyết commit/rollback).
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import desc, func, select
@@ -30,14 +31,18 @@ async def upsert_patient(
     hosp_adm_time: float | None = None,
 ) -> None:
     """Idempotent insert — consumer thấy patient lần đầu thì create, sau đó skip."""
-    stmt = pg_insert(Patient).values(
-        id=patient_id,
-        age=age,
-        gender=gender,
-        unit1=unit1,
-        unit2=unit2,
-        hosp_adm_time=hosp_adm_time,
-    ).on_conflict_do_nothing(index_elements=["id"])
+    stmt = (
+        pg_insert(Patient)
+        .values(
+            id=patient_id,
+            age=age,
+            gender=gender,
+            unit1=unit1,
+            unit2=unit2,
+            hosp_adm_time=hosp_adm_time,
+        )
+        .on_conflict_do_nothing(index_elements=["id"])
+    )
     await session.execute(stmt)
 
 
@@ -120,7 +125,7 @@ async def list_active_patients_with_risk(
     WHY subquery thay vì JOIN trực tiếp: cần latest prediction PER patient,
     DISTINCT ON (Postgres) là cách clean nhất.
     """
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours_window)
+    cutoff = datetime.now(UTC) - timedelta(hours=hours_window)
 
     # Latest prediction per patient: DISTINCT ON (patient_id) ORDER BY hour DESC.
     latest_pred = (
@@ -159,10 +164,7 @@ async def get_patient_vitals(
 ) -> list[Vital]:
     """N vital records mới nhất của 1 patient (theo hour DESC)."""
     stmt = (
-        select(Vital)
-        .where(Vital.patient_id == patient_id)
-        .order_by(Vital.hour.desc())
-        .limit(limit)
+        select(Vital).where(Vital.patient_id == patient_id).order_by(Vital.hour.desc()).limit(limit)
     )
     result = await session.execute(stmt)
     # Reverse để frontend nhận thứ tự thời gian tăng dần (dễ plot).
@@ -191,7 +193,7 @@ async def get_high_risk_alerts(
     hours_window: int = 24,
 ) -> list[dict[str, Any]]:
     """Patients có latest prediction > threshold trong N giờ qua."""
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours_window)
+    cutoff = datetime.now(UTC) - timedelta(hours=hours_window)
 
     latest_pred = (
         select(Prediction)
@@ -312,10 +314,7 @@ async def demote_production_models(session: AsyncSession) -> int:
     version đang active.
     """
     from sqlalchemy import update
-    stmt = (
-        update(ModelVersion)
-        .where(ModelVersion.status == "production")
-        .values(status="archived")
-    )
+
+    stmt = update(ModelVersion).where(ModelVersion.status == "production").values(status="archived")
     result = await session.execute(stmt)
     return result.rowcount or 0

@@ -18,6 +18,7 @@ JSON schema:
   "feature_details": {"HR": {"drifted": true, "p_value": 0.001}, ...}
 }
 """
+
 from __future__ import annotations
 
 import argparse
@@ -25,7 +26,7 @@ import asyncio
 import json
 import logging
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -70,7 +71,7 @@ async def _load_target_from_db(hours_window: int) -> tuple[pd.DataFrame, datetim
     dsn = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
     conn = await asyncpg.connect(dsn=dsn)
     try:
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours_window)
+        cutoff = datetime.now(UTC) - timedelta(hours=hours_window)
         rows = await conn.fetch(
             """
             SELECT hr, o2sat, temp, sbp, map, dbp, resp, etco2, lab_values, created_at
@@ -84,13 +85,19 @@ async def _load_target_from_db(hours_window: int) -> tuple[pd.DataFrame, datetim
         await conn.close()
 
     if not rows:
-        return pd.DataFrame(columns=DRIFT_COLUMNS), cutoff, datetime.now(timezone.utc)
+        return pd.DataFrame(columns=DRIFT_COLUMNS), cutoff, datetime.now(UTC)
 
     data: list[dict[str, Any]] = []
     for r in rows:
         d: dict[str, Any] = {
-            "HR": r["hr"], "O2Sat": r["o2sat"], "Temp": r["temp"], "SBP": r["sbp"],
-            "MAP": r["map"], "DBP": r["dbp"], "Resp": r["resp"], "EtCO2": r["etco2"],
+            "HR": r["hr"],
+            "O2Sat": r["o2sat"],
+            "Temp": r["temp"],
+            "SBP": r["sbp"],
+            "MAP": r["map"],
+            "DBP": r["dbp"],
+            "Resp": r["resp"],
+            "EtCO2": r["etco2"],
         }
         # lab_values là JSONB → asyncpg trả về str (JSON). Parse khi cần.
         labs_raw = r["lab_values"]
@@ -152,8 +159,7 @@ def _run_evidently(reference: pd.DataFrame, current: pd.DataFrame) -> dict[str, 
     }
 
 
-async def run(reference_sample: int, hours_window: int,
-              reference_dir: Path) -> dict[str, Any]:
+async def run(reference_sample: int, hours_window: int, reference_dir: Path) -> dict[str, Any]:
     """Chạy full pipeline drift check. Return dict JSON-serializable."""
     reference_df = _load_reference(reference_dir, sample_size=reference_sample)
 
@@ -174,13 +180,11 @@ async def run(reference_sample: int, hours_window: int,
     # (hoặc reference). Lab values rất sparse (>90% NaN ở PhysioNet), với data
     # DB ít rows thì 1 lab có thể tình cờ toàn NaN. Bỏ cột đó khỏi drift check.
     valid_cols = [
-        c for c in DRIFT_COLUMNS
-        if target_df[c].notna().any() and reference_df[c].notna().any()
+        c for c in DRIFT_COLUMNS if target_df[c].notna().any() and reference_df[c].notna().any()
     ]
     dropped = [c for c in DRIFT_COLUMNS if c not in valid_cols]
     if dropped:
-        logger.info("Skipping %d cols toàn NaN (ref hoặc target): %s",
-                    len(dropped), dropped)
+        logger.info("Skipping %d cols toàn NaN (ref hoặc target): %s", len(dropped), dropped)
 
     if not valid_cols:
         return {
@@ -212,12 +216,24 @@ async def run(reference_sample: int, hours_window: int,
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Sepsis drift detection")
-    parser.add_argument("--mode", choices=["daily", "manual"], default="manual",
-                        help="Chỉ là label trong log, không ảnh hưởng logic.")
-    parser.add_argument("--reference-sample", type=int, default=5000,
-                        help="Số row sample từ training data làm reference.")
-    parser.add_argument("--hours-window", type=int, default=24,
-                        help="Số giờ DB data làm target (cutoff = NOW - N hours).")
+    parser.add_argument(
+        "--mode",
+        choices=["daily", "manual"],
+        default="manual",
+        help="Chỉ là label trong log, không ảnh hưởng logic.",
+    )
+    parser.add_argument(
+        "--reference-sample",
+        type=int,
+        default=5000,
+        help="Số row sample từ training data làm reference.",
+    )
+    parser.add_argument(
+        "--hours-window",
+        type=int,
+        default=24,
+        help="Số giờ DB data làm target (cutoff = NOW - N hours).",
+    )
     parser.add_argument("--reference-dir", type=Path, default=DEFAULT_REFERENCE_DIR)
     args = parser.parse_args()
 
@@ -228,11 +244,13 @@ def main() -> None:
     )
 
     try:
-        result = asyncio.run(run(
-            reference_sample=args.reference_sample,
-            hours_window=args.hours_window,
-            reference_dir=args.reference_dir,
-        ))
+        result = asyncio.run(
+            run(
+                reference_sample=args.reference_sample,
+                hours_window=args.hours_window,
+                reference_dir=args.reference_dir,
+            )
+        )
     except Exception:
         logger.exception("Drift check failed")
         sys.exit(1)

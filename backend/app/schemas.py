@@ -5,6 +5,7 @@ Quy tắc:
 - `from_attributes=True` để parse trực tiếp từ ORM instance.
 - Field naming snake_case khớp DB. Frontend TS type sẽ match (xem frontend/CLAUDE.md).
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -18,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field
 # ============================================================================
 class PatientSummary(BaseModel):
     """List view: id + risk hiện tại + last update."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -61,6 +63,7 @@ class PredictionRecord(BaseModel):
 
 class AlertRecord(BaseModel):
     """Output `/predictions/alerts`. Subset của PredictionRecord."""
+
     patient_id: str
     hour: int
     sepsis_risk: float
@@ -104,6 +107,7 @@ class DriftReportRecord(BaseModel):
 # ============================================================================
 class WSPredictionEvent(BaseModel):
     """Broadcast tới frontend qua /ws/predictions."""
+
     type: str = Field(default="prediction", description="Discriminator cho frontend")
     patient_id: str
     hour: int

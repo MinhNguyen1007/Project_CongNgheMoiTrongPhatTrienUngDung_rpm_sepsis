@@ -13,6 +13,7 @@ Pipeline cho mỗi message:
 2. predict_one() (sync, thread-safe vì model cache có lock).
 3. Submit coroutine vào main event loop: upsert patient/vital/prediction + broadcast.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -20,15 +21,15 @@ import json
 import logging
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from kafka import KafkaConsumer
 from kafka.errors import NoBrokersAvailable
 
 from backend.app.config import settings
-from backend.app.db.base import AsyncSessionLocal
 from backend.app.db import crud
+from backend.app.db.base import AsyncSessionLocal
 from backend.app.ml.predictor import predict_one
 from backend.app.schemas import WSPredictionEvent
 from backend.app.ws_manager import manager
@@ -60,6 +61,7 @@ async def _persist_and_broadcast(
 
         # Tách vitals (8 cột) và labs (26 cột) — labs gộp vào JSONB.
         from backend.app.ml.features import LAB_COLS, VITAL_COLS  # local import tránh vòng
+
         vital_only = {k: vitals.get(k) for k in VITAL_COLS}
         lab_only = {k: vitals.get(k) for k in LAB_COLS}
 
@@ -86,7 +88,7 @@ async def _persist_and_broadcast(
         sepsis_risk=sepsis_risk,
         alert=alert,
         model_version=model_version,
-        predicted_at=datetime.now(timezone.utc),
+        predicted_at=datetime.now(UTC),
     )
     await manager.broadcast(event.model_dump(mode="json"))
 
@@ -132,8 +134,9 @@ class ConsumerThread(threading.Thread):
             except NoBrokersAvailable:
                 if self._stop_event.is_set():
                     raise
-                logger.warning("Kafka not ready (attempt %d/%d), retry in 2s...",
-                               attempt + 1, retries)
+                logger.warning(
+                    "Kafka not ready (attempt %d/%d), retry in 2s...", attempt + 1, retries
+                )
                 time.sleep(2)
         raise RuntimeError("Cannot connect to Kafka")
 
@@ -172,8 +175,11 @@ class ConsumerThread(threading.Thread):
         future.add_done_callback(_log_task_exception)
 
     def run(self) -> None:
-        logger.info("Consumer thread starting, topic=%s, group=%s",
-                    settings.kafka_topic_vitals, settings.kafka_consumer_group)
+        logger.info(
+            "Consumer thread starting, topic=%s, group=%s",
+            settings.kafka_topic_vitals,
+            settings.kafka_consumer_group,
+        )
         try:
             self._consumer = self._connect()
         except Exception:

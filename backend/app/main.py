@@ -4,6 +4,7 @@ Lifespan:
 - Startup: load model cache → start Kafka consumer thread → start scheduler.
 - Shutdown: stop scheduler → stop consumer → dispose DB engine.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -29,16 +30,17 @@ async def lifespan(app: FastAPI):
         level=settings.log_level,
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
-    logger.info("Backend starting. db=%s mlflow=%s",
-                settings.database_url.split("@")[-1],  # giấu password
-                settings.mlflow_tracking_uri)
+    logger.info(
+        "Backend starting. db=%s mlflow=%s",
+        settings.database_url.split("@")[-1],  # giấu password
+        settings.mlflow_tracking_uri,
+    )
 
     # Warm cache model. Nếu MLflow chưa có model → log warning, không crash
     # (cho phép start backend trước khi train xong, tiện dev).
     try:
         m = get_model()
-        logger.info("Loaded model version=%s with %d features",
-                    m.version, len(m.feature_names))
+        logger.info("Loaded model version=%s with %d features", m.version, len(m.feature_names))
     except Exception as exc:
         logger.warning("Model load failed (will retry on first predict): %s", exc)
 

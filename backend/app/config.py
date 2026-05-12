@@ -3,6 +3,7 @@
 WHY pydantic-settings thay vì os.environ: validate type + default value + tự
 load `.env`. Code khác (consumer, scheduler) import `settings` → 1 nguồn duy nhất.
 """
+
 from __future__ import annotations
 
 from functools import lru_cache

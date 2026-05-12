@@ -1,4 +1,5 @@
 """Prediction endpoints."""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
@@ -20,9 +21,7 @@ async def list_alerts(
 ) -> list[AlertRecord]:
     """Latest prediction của patients có risk > threshold."""
     thr = threshold if threshold is not None else settings.model_threshold
-    rows = await crud.get_high_risk_alerts(
-        session, threshold=thr, hours_window=hours_window
-    )
+    rows = await crud.get_high_risk_alerts(session, threshold=thr, hours_window=hours_window)
     return [AlertRecord(**r) for r in rows]
 
 

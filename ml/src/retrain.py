@@ -17,6 +17,7 @@ CLI:
     python -m ml.src.retrain --reason manual
     python -m ml.src.retrain --reason drift --hours-from-db 168
 """
+
 from __future__ import annotations
 
 import argparse
@@ -24,7 +25,7 @@ import asyncio
 import json
 import logging
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -38,7 +39,6 @@ from backend.app.config import settings
 from ml.src.preprocess import (
     LAB_COLS,
     TARGET_COL,
-    VITAL_COLS,
     feature_engineering,
     load_psv_files,
     split_train_val,
@@ -59,7 +59,7 @@ async def _fetch_db_vitals(hours: int) -> pd.DataFrame:
     dsn = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
     conn = await asyncpg.connect(dsn=dsn)
     try:
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+        cutoff = datetime.now(UTC) - timedelta(hours=hours)
         rows = await conn.fetch(
             """
             SELECT v.patient_id, v.hour, v.hr, v.o2sat, v.temp, v.sbp, v.map,
@@ -83,10 +83,19 @@ async def _fetch_db_vitals(hours: int) -> pd.DataFrame:
         d: dict[str, Any] = {
             "patient_id": r["patient_id"],
             "ICULOS": r["hour"],
-            "HR": r["hr"], "O2Sat": r["o2sat"], "Temp": r["temp"], "SBP": r["sbp"],
-            "MAP": r["map"], "DBP": r["dbp"], "Resp": r["resp"], "EtCO2": r["etco2"],
-            "Age": r["age"], "Gender": r["gender"],
-            "Unit1": r["unit1"], "Unit2": r["unit2"], "HospAdmTime": r["hosp_adm_time"],
+            "HR": r["hr"],
+            "O2Sat": r["o2sat"],
+            "Temp": r["temp"],
+            "SBP": r["sbp"],
+            "MAP": r["map"],
+            "DBP": r["dbp"],
+            "Resp": r["resp"],
+            "EtCO2": r["etco2"],
+            "Age": r["age"],
+            "Gender": r["gender"],
+            "Unit1": r["unit1"],
+            "Unit2": r["unit2"],
+            "HospAdmTime": r["hosp_adm_time"],
             TARGET_COL: r["sepsis_label"],
         }
         labs_raw = r["lab_values"]
@@ -115,9 +124,7 @@ def _get_production_auroc() -> float | None:
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
     client = MlflowClient(tracking_uri=settings.mlflow_tracking_uri)
     try:
-        mv = client.get_model_version_by_alias(
-            name=settings.model_name, alias=settings.model_alias
-        )
+        mv = client.get_model_version_by_alias(name=settings.model_name, alias=settings.model_alias)
     except Exception as exc:
         logger.warning("No production alias yet: %s", exc)
         return None
@@ -134,14 +141,18 @@ async def run(reason: str, hours_from_db: int, max_patients: int | None) -> dict
 
     # 1. Load training data baseline.
     base_df = load_psv_files(DEFAULT_DATA_DIRS, max_patients=max_patients)
-    logger.info("Baseline data: %d rows, %d patients",
-                len(base_df), base_df["patient_id"].nunique())
+    logger.info(
+        "Baseline data: %d rows, %d patients", len(base_df), base_df["patient_id"].nunique()
+    )
 
     # 2. Pull DB data.
     db_df = await _fetch_db_vitals(hours_from_db)
     n_db_rows = len(db_df)
-    logger.info("DB data: %d rows, %d patients",
-                n_db_rows, db_df["patient_id"].nunique() if n_db_rows else 0)
+    logger.info(
+        "DB data: %d rows, %d patients",
+        n_db_rows,
+        db_df["patient_id"].nunique() if n_db_rows else 0,
+    )
 
     # 3. Combine (DB data nối vào sau, không thay thế baseline).
     combined = pd.concat([base_df, db_df], ignore_index=True) if n_db_rows else base_df
@@ -179,11 +190,19 @@ async def run(reason: str, hours_from_db: int, max_patients: int | None) -> dict
             version=new_version_num,
         )
         promoted = True
-        logger.info("Promoted version=%s (auroc %.4f > prod %.4f)",
-                    new_version_num, new_auroc, production_auroc or 0)
+        logger.info(
+            "Promoted version=%s (auroc %.4f > prod %.4f)",
+            new_version_num,
+            new_auroc,
+            production_auroc or 0,
+        )
     else:
-        logger.info("New version=%s NOT promoted (auroc %.4f <= prod %.4f)",
-                    new_version_num, new_auroc, production_auroc)
+        logger.info(
+            "New version=%s NOT promoted (auroc %.4f <= prod %.4f)",
+            new_version_num,
+            new_auroc,
+            production_auroc,
+        )
 
     # Free memory trước khi return (model nặng).
     del booster, train_df, val_df, feats, combined, base_df, db_df
@@ -204,12 +223,19 @@ async def run(reason: str, hours_from_db: int, max_patients: int | None) -> dict
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Sepsis retrain pipeline")
-    parser.add_argument("--reason", choices=["manual", "drift", "scheduled"],
-                        default="manual")
-    parser.add_argument("--hours-from-db", type=int, default=24 * 7,
-                        help="Số giờ DB data nối vào training (default: 7 ngày).")
-    parser.add_argument("--max-patients", type=int, default=None,
-                        help="Limit baseline patient để train nhanh (test). None=full.")
+    parser.add_argument("--reason", choices=["manual", "drift", "scheduled"], default="manual")
+    parser.add_argument(
+        "--hours-from-db",
+        type=int,
+        default=24 * 7,
+        help="Số giờ DB data nối vào training (default: 7 ngày).",
+    )
+    parser.add_argument(
+        "--max-patients",
+        type=int,
+        default=None,
+        help="Limit baseline patient để train nhanh (test). None=full.",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -222,11 +248,13 @@ def main() -> None:
     np.random.seed(42)
 
     try:
-        result = asyncio.run(run(
-            reason=args.reason,
-            hours_from_db=args.hours_from_db,
-            max_patients=args.max_patients,
-        ))
+        result = asyncio.run(
+            run(
+                reason=args.reason,
+                hours_from_db=args.hours_from_db,
+                max_patients=args.max_patients,
+            )
+        )
     except Exception:
         logger.exception("Retrain failed")
         sys.exit(1)

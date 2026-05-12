@@ -12,6 +12,7 @@ Chạy:
     python -m streaming.dev_predict_smoke --patient p000001 --hours 30
     python -m streaming.dev_predict_smoke --compare-batch
 """
+
 from __future__ import annotations
 
 import argparse
@@ -34,13 +35,9 @@ def _row_to_kafka_payload(row: pd.Series) -> tuple[dict, dict]:
     Producer sau này (T4) sẽ build payload giống y vầy rồi push lên Kafka.
     """
     vital_lab = {
-        col: (None if pd.isna(row[col]) else float(row[col]))
-        for col in VITAL_COLS + LAB_COLS
+        col: (None if pd.isna(row[col]) else float(row[col])) for col in VITAL_COLS + LAB_COLS
     }
-    demographics = {
-        col: (None if pd.isna(row[col]) else float(row[col]))
-        for col in DEMO_COLS
-    }
+    demographics = {col: (None if pd.isna(row[col]) else float(row[col])) for col in DEMO_COLS}
     return vital_lab, demographics
 
 
@@ -57,26 +54,27 @@ def run_streaming_smoke(patient_id: str, n_hours: int) -> pd.DataFrame:
     for _, row in df.iterrows():
         vital_lab, demographics = _row_to_kafka_payload(row)
         result = predict_one(patient_id, vital_lab, demographics)
-        results.append({
-            "hour": int(row["ICULOS"]),
-            "sepsis_label": int(row["SepsisLabel"]),
-            "risk": round(result.sepsis_risk, 4),
-            "alert": result.alert,
-        })
+        results.append(
+            {
+                "hour": int(row["ICULOS"]),
+                "sepsis_label": int(row["SepsisLabel"]),
+                "risk": round(result.sepsis_risk, 4),
+                "alert": result.alert,
+            }
+        )
 
     return pd.DataFrame(results)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--patient", default="p000001",
-                        help="Patient ID (file phải tồn tại trong training_setA)")
-    parser.add_argument("--hours", type=int, default=30,
-                        help="Số giờ đầu để stream")
+    parser.add_argument(
+        "--patient", default="p000001", help="Patient ID (file phải tồn tại trong training_setA)"
+    )
+    parser.add_argument("--hours", type=int, default=30, help="Số giờ đầu để stream")
     args = parser.parse_args()
 
-    logging.basicConfig(level=logging.INFO,
-                        format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
     results = run_streaming_smoke(args.patient, args.hours)
     print(results.to_string(index=False))

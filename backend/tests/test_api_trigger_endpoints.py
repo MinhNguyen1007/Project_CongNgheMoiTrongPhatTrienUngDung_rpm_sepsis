@@ -4,6 +4,7 @@ Cả 2 endpoint phải trả 202 ngay + spawn background task (không block clie
 Test dùng TestClient với FastAPI app minimal (không qua lifespan của main.py)
 để tránh load model + connect Kafka.
 """
+
 from __future__ import annotations
 
 from unittest.mock import patch

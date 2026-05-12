@@ -1,0 +1,40 @@
+# Config cho ruff + black. CI workflow đọc từ đây.
+# Không phải build config (không build wheel) — chỉ tooling.
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [
+    "venv",
+    "ml/notebooks",
+    "backend/app/alembic/versions",
+    "mlruns",
+    "mlartifacts",
+]
+
+[tool.ruff.lint]
+# Subset thân thiện: pycodestyle errors + pyflakes + import sort + bug-bear.
+# Bỏ ANN/D/N (annotation + docstring + naming strict) — đồ án scope nhỏ.
+select = ["E", "F", "I", "B", "UP", "W"]
+ignore = [
+    "E501",  # line-too-long — black đã handle, ruff line-length=100 đôi khi vẫn vượt với chuỗi
+    "B008",  # function-call-in-default-argument — FastAPI Depends() pattern
+    "UP007", # Union → X | Y — giữ Union cho rõ với Pydantic
+]
+
+[tool.ruff.lint.per-file-ignores]
+"backend/tests/**" = ["E402"]  # pytest.importorskip có thể trước import
+"ml/src/**" = ["B007"]         # unused loop var trong XGBoost iteration ok
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+extend-exclude = '''
+/(
+    venv
+  | ml/notebooks
+  | backend/app/alembic/versions
+  | mlruns
+  | mlartifacts
+)/
+'''

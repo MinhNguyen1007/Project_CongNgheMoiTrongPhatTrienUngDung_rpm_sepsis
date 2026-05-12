@@ -9,6 +9,7 @@ WHY PatientBuffer: rolling features cần 6h history. Buffer in-memory giữ
 12h gần nhất per patient → đủ cho rolling 6h + delta. TTL 6h từ giờ cuối cùng
 nhận message để tránh memory leak khi patient discharge.
 """
+
 from __future__ import annotations
 
 import time
@@ -23,11 +24,32 @@ import numpy as np
 # phải sửa cả đây. Đây là cái giá phải trả của việc tách module.
 VITAL_COLS: list[str] = ["HR", "O2Sat", "Temp", "SBP", "MAP", "DBP", "Resp", "EtCO2"]
 LAB_COLS: list[str] = [
-    "BaseExcess", "HCO3", "FiO2", "pH", "PaCO2", "SaO2",
-    "AST", "BUN", "Alkalinephos", "Calcium", "Chloride", "Creatinine",
-    "Bilirubin_direct", "Glucose", "Lactate", "Magnesium", "Phosphate",
-    "Potassium", "Bilirubin_total", "TroponinI", "Hct", "Hgb", "PTT",
-    "WBC", "Fibrinogen", "Platelets",
+    "BaseExcess",
+    "HCO3",
+    "FiO2",
+    "pH",
+    "PaCO2",
+    "SaO2",
+    "AST",
+    "BUN",
+    "Alkalinephos",
+    "Calcium",
+    "Chloride",
+    "Creatinine",
+    "Bilirubin_direct",
+    "Glucose",
+    "Lactate",
+    "Magnesium",
+    "Phosphate",
+    "Potassium",
+    "Bilirubin_total",
+    "TroponinI",
+    "Hct",
+    "Hgb",
+    "PTT",
+    "WBC",
+    "Fibrinogen",
+    "Platelets",
 ]
 DEMO_COLS: list[str] = ["Age", "Gender", "Unit1", "Unit2", "HospAdmTime", "ICULOS"]
 
@@ -39,6 +61,7 @@ BUFFER_TTL_SECONDS: int = 24 * 3600  # discharge buffer sau 24h không activity
 @dataclass
 class _PatientState:
     """In-memory state cho 1 patient. Mutable, single-thread (consumer)."""
+
     # deque(maxlen=12): rows gần nhất, mỗi row = dict[col -> float|None].
     history: deque[dict[str, float | None]] = field(
         default_factory=lambda: deque(maxlen=BUFFER_MAX_LEN)
@@ -122,15 +145,15 @@ def compute_features(
     hist_list = list(state.history)
     window = hist_list[-ROLLING_WINDOW:]  # tối đa 6 row cuối, có thể ít hơn
     for col in VITAL_COLS:
-        values = np.array(
-            [_safe_float(r.get(col)) for r in window], dtype=np.float64
-        )
+        values = np.array([_safe_float(r.get(col)) for r in window], dtype=np.float64)
         # nanmean/std bỏ qua NaN; nếu toàn NaN → trả NaN. Suppress cosmetic
         # "Mean of empty slice" / "Degrees of freedom <= 0" — đây là behavior
         # mong muốn, không phải lỗi.
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=RuntimeWarning)
-            feats[f"{col}_roll_mean_6h"] = float(np.nanmean(values)) if values.size else float("nan")
+            feats[f"{col}_roll_mean_6h"] = (
+                float(np.nanmean(values)) if values.size else float("nan")
+            )
             feats[f"{col}_roll_std_6h"] = (
                 float(np.nanstd(values, ddof=1)) if values.size > 1 else float("nan")
             )

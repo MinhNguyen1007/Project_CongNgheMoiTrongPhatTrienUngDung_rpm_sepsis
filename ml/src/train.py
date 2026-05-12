@@ -12,6 +12,7 @@ WHY log MLflow ngay từ baseline: scheduler (weekly retrain) sẽ so sánh AURO
 của model mới với Production hiện tại — không có MLflow registry thì không
 auto-promote được.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -86,8 +87,12 @@ def train_model(
         metrics: dict AUROC, AUPRC, Utility trên val set.
     """
     feature_cols = get_feature_columns(train_df)
-    logger.info("Training XGBoost on %d features, %d train rows, %d val rows",
-                len(feature_cols), len(train_df), len(val_df))
+    logger.info(
+        "Training XGBoost on %d features, %d train rows, %d val rows",
+        len(feature_cols),
+        len(train_df),
+        len(val_df),
+    )
 
     # scale_pos_weight = neg/pos để cân class imbalance.
     n_pos = int(train_df[TARGET_COL].sum())
@@ -133,28 +138,46 @@ def train_model(
             artifact_path="model",
             registered_model_name=registered_name,
         )
-        logger.info("MLflow run_id=%s, best_iter=%d, metrics=%s",
-                    run.info.run_id, booster.best_iteration, metrics)
+        logger.info(
+            "MLflow run_id=%s, best_iter=%d, metrics=%s",
+            run.info.run_id,
+            booster.best_iteration,
+            metrics,
+        )
 
     return booster, metrics
 
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train sepsis XGBoost baseline.")
-    parser.add_argument("--max-patients", type=int, default=None,
-                        help="Limit số patient để debug. None = full ~40k.")
+    parser.add_argument(
+        "--max-patients",
+        type=int,
+        default=None,
+        help="Limit số patient để debug. None = full ~40k.",
+    )
     parser.add_argument("--val-size", type=float, default=0.2)
     parser.add_argument("--random-state", type=int, default=42)
     parser.add_argument("--num-rounds", type=int, default=DEFAULT_NUM_BOOST_ROUND)
     parser.add_argument("--early-stopping", type=int, default=DEFAULT_EARLY_STOPPING)
     parser.add_argument("--threshold", type=float, default=DEFAULT_THRESHOLD)
-    parser.add_argument("--register", action="store_true",
-                        help="Register model vào MLflow Registry.")
-    parser.add_argument("--mlflow-uri", type=str, default=None,
-                        help="Override MLFLOW_TRACKING_URI env (vd: http://localhost:5000).")
+    parser.add_argument(
+        "--register", action="store_true", help="Register model vào MLflow Registry."
+    )
+    parser.add_argument(
+        "--mlflow-uri",
+        type=str,
+        default=None,
+        help="Override MLFLOW_TRACKING_URI env (vd: http://localhost:5000).",
+    )
     parser.add_argument("--run-name", type=str, default=None)
-    parser.add_argument("--data-dirs", type=str, nargs="*", default=None,
-                        help="Override data dirs (default: ml/data/training_setA + setB).")
+    parser.add_argument(
+        "--data-dirs",
+        type=str,
+        nargs="*",
+        default=None,
+        help="Override data dirs (default: ml/data/training_setA + setB).",
+    )
     return parser.parse_args()
 
 

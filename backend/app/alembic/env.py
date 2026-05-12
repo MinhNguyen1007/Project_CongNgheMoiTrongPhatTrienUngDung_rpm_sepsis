@@ -3,6 +3,7 @@
 WHY async run_migrations: project dùng asyncpg cho runtime. Để không thêm
 psycopg2 chỉ để migrate, chạy migration qua async engine.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -14,8 +15,8 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from backend.app.config import settings
-from backend.app.db.base import Base
 from backend.app.db import models  # noqa: F401 — import để Base metadata thấy ORM models
+from backend.app.db.base import Base
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)

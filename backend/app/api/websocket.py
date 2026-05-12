@@ -3,6 +3,7 @@
 Consumer thread → manager.broadcast() → tất cả connected client nhận event.
 Frontend subscribe `/ws/predictions` qua hook useWebSocket.
 """
+
 from __future__ import annotations
 
 import logging

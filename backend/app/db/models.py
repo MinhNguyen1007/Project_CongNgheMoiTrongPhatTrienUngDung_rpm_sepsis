@@ -7,6 +7,7 @@ Quy tắc:
 - lab_values JSONB (Postgres native) thay vì tách 26 cột → giảm schema bloat,
   query lab cụ thể ít, dashboard chỉ cần snapshot.
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -37,9 +38,7 @@ class Patient(Base):
     unit1: Mapped[float | None] = mapped_column(Float, nullable=True)
     unit2: Mapped[float | None] = mapped_column(Float, nullable=True)
     hosp_adm_time: Mapped[float | None] = mapped_column(Float, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     vitals: Mapped[list[Vital]] = relationship(
         back_populates="patient", cascade="all, delete-orphan"
@@ -72,9 +71,7 @@ class Vital(Base):
     lab_values: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     sepsis_label: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     patient: Mapped[Patient] = relationship(back_populates="vitals")
 
@@ -113,6 +110,7 @@ class ModelVersion(Base):
     Mirror của MLflow Registry — dùng để frontend show history mà không phải
     gọi MLflow API mỗi request (chậm + thêm dependency).
     """
+
     __tablename__ = "model_version"
 
     version: Mapped[str] = mapped_column(String(20), primary_key=True)
@@ -123,9 +121,7 @@ class ModelVersion(Base):
     threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
     # status: 'production' | 'staging' | 'archived' (mirror MLflow alias)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="staging")
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class DriftReport(Base):
@@ -134,6 +130,7 @@ class DriftReport(Base):
     `drift_share` = tỷ lệ feature bị flag drifted. > DRIFT_FEATURES_THRESHOLD
     → trigger retrain.
     """
+
     __tablename__ = "drift_report"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -144,6 +141,4 @@ class DriftReport(Base):
     drift_share: Mapped[float] = mapped_column(Float, nullable=False)
     triggered_retrain: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     report_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

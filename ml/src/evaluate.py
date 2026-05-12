@@ -12,6 +12,7 @@ có trong sklearn. Công thức từ paper Reyna et al. 2019 (Crit Care Med):
   - u_tp=1, u_fn=-2, u_fp=-0.05, u_tn=0
   - Reward tăng tuyến tính trong [-12, -6], giảm tuyến tính trong [-6, 3].
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -154,8 +155,9 @@ def compute_metrics(
 
     df_eval = df[[patient_col, hour_col, label_col]].copy()
     df_eval["prediction"] = (y_score >= threshold).astype(int)
-    metrics["utility"] = compute_utility(df_eval, label_col=label_col,
-                                         patient_col=patient_col, hour_col=hour_col)
+    metrics["utility"] = compute_utility(
+        df_eval, label_col=label_col, patient_col=patient_col, hour_col=hour_col
+    )
     metrics["threshold"] = threshold
     metrics["positive_rate"] = float(df_eval["prediction"].mean())
     return metrics

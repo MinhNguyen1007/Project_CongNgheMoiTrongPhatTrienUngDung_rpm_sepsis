@@ -15,6 +15,7 @@ Logic:
   drift_report → trigger retrain nếu drift_share > settings.drift_features_threshold.
 - weekly_retrain_job (Sun 3 AM): subprocess retrain → reload model in-memory.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -22,7 +23,7 @@ import json
 import logging
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -88,8 +89,8 @@ async def run_drift_check(reason: str = "manual") -> dict:
     async with AsyncSessionLocal() as session:
         await crud.create_drift_report(
             session,
-            ref_period_start=datetime.now(timezone.utc),  # reference is static training data
-            ref_period_end=datetime.now(timezone.utc),
+            ref_period_start=datetime.now(UTC),  # reference is static training data
+            ref_period_end=datetime.now(UTC),
             target_period_start=_parse_dt(target.get("start")),
             target_period_end=_parse_dt(target.get("end")),
             drift_share=result["drift_share"],
@@ -98,8 +99,9 @@ async def run_drift_check(reason: str = "manual") -> dict:
         )
         await session.commit()
 
-    logger.info("Drift check done. share=%.3f, triggered_retrain=%s",
-                result["drift_share"], triggered)
+    logger.info(
+        "Drift check done. share=%.3f, triggered_retrain=%s", result["drift_share"], triggered
+    )
 
     if triggered:
         logger.info("Drift > threshold → spawning retrain job")
@@ -148,18 +150,19 @@ async def run_retrain(reason: str = "manual") -> dict:
         except Exception:
             logger.exception("Reload model failed after promote")
 
-    logger.info("Retrain done. promoted=%s, new_auroc=%.4f",
-                result["promoted"], result["new_auroc"])
+    logger.info(
+        "Retrain done. promoted=%s, new_auroc=%.4f", result["promoted"], result["new_auroc"]
+    )
     return result
 
 
 def _parse_dt(s: str | None) -> datetime:
     if s is None:
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
     try:
         return datetime.fromisoformat(s.replace("Z", "+00:00"))
     except ValueError:
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
 
 
 # ============================================================================
@@ -174,8 +177,8 @@ def create_scheduler() -> AsyncIOScheduler:
         trigger=CronTrigger(hour=2, minute=0),  # daily 2AM UTC
         id="daily_drift_check",
         kwargs={"reason": "daily"},
-        max_instances=1,         # đảm bảo không chồng job nếu run lâu
-        coalesce=True,           # missed runs → merge thành 1 lần
+        max_instances=1,  # đảm bảo không chồng job nếu run lâu
+        coalesce=True,  # missed runs → merge thành 1 lần
         misfire_grace_time=300,  # 5 phút grace nếu app start trễ
     )
     scheduler.add_job(
@@ -188,6 +191,7 @@ def create_scheduler() -> AsyncIOScheduler:
         misfire_grace_time=600,
     )
 
-    logger.info("Scheduler configured: daily_drift_check (2AM UTC), "
-                "weekly_retrain (Sun 3AM UTC)")
+    logger.info(
+        "Scheduler configured: daily_drift_check (2AM UTC), " "weekly_retrain (Sun 3AM UTC)"
+    )
     return scheduler
