@@ -125,7 +125,7 @@ def train_model(
         # Score val + compute full metrics (AUROC, AUPRC, PhysioNet Utility).
         y_score = booster.predict(dval, iteration_range=(0, booster.best_iteration + 1))
         metrics = compute_metrics(val_df, y_score, threshold=threshold)
-        mlflow.log_metrics({k: v for k, v in metrics.items() if isinstance(v, (int, float))})
+        mlflow.log_metrics({k: v for k, v in metrics.items() if isinstance(v, int | float)})
 
         # Feature importance — hữu ích cho EDA + báo cáo + drift analysis.
         importance = booster.get_score(importance_type="gain")
