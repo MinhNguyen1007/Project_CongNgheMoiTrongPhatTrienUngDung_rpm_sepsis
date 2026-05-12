@@ -31,7 +31,9 @@ Hệ thống Giám sát Bệnh nhân Từ xa với Streaming + MLOps. Đồ án 
 | T4    | ✅ Done    | Kafka KRaft (`apache/kafka:3.7.0`), producer streaming PSV, consumer thread + WS broadcast.                              |
 | T5    | ✅ Done    | React 18 + Vite + Tailwind + TanStack Query. Dashboard, PatientDetail (Chart.js timelines), ModelRegistry, DriftReports.   |
 | T6    | ✅ Done    | `drift_detect.py` (Evidently, NaN-safe filter), `retrain.py` (pull DB + train + promote-on-better-AUROC guard), APScheduler hook lifespan, manual triggers `POST /api/drift/check` + `POST /api/models/retrain`, 9 pytest. Subprocess dùng `asyncio.to_thread` (Windows compat). |
-| T7    | 🚧 In progress | Dockerize backend/frontend, GitHub Actions CI/CD, AWS deploy.                                                              |
+| T7.1  | ✅ Done    | Dockerize full stack: 3 Dockerfile (backend slim+alembic+uvicorn, frontend multi-stage Vite→nginx proxy, mlflow SQLite+serve-artifacts), `docker-compose.prod.yml` 5 services + healthcheck + Kafka multi-listener fix, smoke E2E pass local. |
+| T7.2  | ✅ Done    | GitHub Actions CI (`.github/workflows/ci.yml`): 4 job lint (ruff+black) / test (9 pytest) / frontend (tsc) / build-push (3 image → `ghcr.io/minhnguyen1007/sepsis-{backend,frontend,mlflow}:{latest,sha}`). `pyproject.toml` ruff+black config line-length 100. |
+| T7.3  | 🚧 In progress | AWS EC2 t3.micro + RDS deploy, pull image từ GHCR (không build trên 1GB RAM).                                              |
 | CN    | ⬜ Todo    | Polish UI, viết báo cáo, record demo.                                                                                     |
 
 **Baseline AUROC: 0.838, AUPRC: 0.110, Utility: 0.825 @ thr=0.70** (full ~40k patient, MLflow registered alias `production`, version 1).
@@ -82,9 +84,17 @@ Project/                          # = project root (cwd)
 │   ├── producer.py               # PSV → Kafka, supports interleave + rate limit
 │   └── dev_predict_smoke.py      # Smoke test predict pipeline (không cần Kafka)
 ├── infra/
-│   └── docker-compose.yml        # Postgres 15 + Kafka 3.7 (apache/kafka)
+│   ├── docker-compose.yml        # Dev: Postgres 15 + Kafka 3.7 (apache/kafka)
+│   ├── docker-compose.prod.yml   # Prod: + backend + frontend + mlflow (5 services)
+│   ├── Dockerfile.backend        # python:3.11-slim + alembic + uvicorn
+│   ├── Dockerfile.frontend       # multi-stage Vite build → nginx
+│   ├── Dockerfile.mlflow         # mlflow 2.22 + SQLite + serve-artifacts
+│   ├── nginx.conf                # SPA fallback + reverse-proxy /api/ + /ws/
+│   └── .env.prod.example
+├── .github/workflows/ci.yml      # T7.2: lint + pytest + frontend + build-push GHCR
 ├── venv/                         # 1 venv chung (gitignore)
 ├── requirements.txt              # ML + Backend + Streaming deps
+├── pyproject.toml                # ruff + black config (line-length 100, target py311)
 ├── alembic.ini
 ├── .env.example
 └── README.md
@@ -254,7 +264,7 @@ python -m streaming.dev_predict_smoke --patient p000009 --hours 60
 | **T4** | ✅ Done         | Kafka KRaft local, producer interleave + rate, consumer thread, save DB, WebSocket broadcast                                |
 | **T5** | ✅ Done         | React + Vite + Tailwind. Dashboard (list/alerts/stats), PatientDetail (vital + risk charts), ModelInfo, DriftReports        |
 | **T6** | ✅ Done         | Evidently drift detect, retrain orchestrator, APScheduler jobs daily/weekly, manual trigger endpoints, 9 pytest, smoke test full chain |
-| **T7** | 🚧 In progress | Dockerize, GitHub Actions, deploy AWS EC2 + RDS                                                                              |
+| **T7** | 🚧 2/3 phase   | ✅ Dockerize (3 Dockerfile + compose.prod) · ✅ CI (lint/test/frontend/build-push GHCR) · ⬜ AWS deploy                       |
 | **CN** | ⬜ Todo         | Polish UI, viết báo cáo, record demo video                                                                                  |
 
 ## Database schema
@@ -307,26 +317,34 @@ jupyter nbconvert --clear-output --inplace ml/notebooks/*.ipynb
 
 **Lưu ý constraint t3.micro 1GB RAM:**
 
-* Kafka cần config `KAFKA_HEAP_OPTS=-Xmx256m -Xms256m` (mặc định 1GB sẽ OOM)
+* Kafka đã set `KAFKA_HEAP_OPTS=-Xmx512m -Xms256m` trong `compose.prod.yml`. Nếu OOM, hạ xuống `-Xmx256m`.
 * Backend FastAPI: 1 worker, không multi-process
-* Tách MLflow server ra ngoài (chạy local máy Hứa) hoặc dùng SQLite + S3 backend cho MLflow
+* **KHÔNG build image trên EC2** (xgboost compile sẽ OOM) — pull image đã build sẵn từ GHCR
+* MLflow container dùng SQLite local + volume, hoặc nâng cấp lên S3 backend nếu muốn HA
 
-**Deploy steps:**
+**Deploy steps (image đã có sẵn ở GHCR từ CI):**
 
 ```bash
-# 1. Build và push images lên Docker Hub
-docker build -t huu/monitoring-backend:v1 -f infra/Dockerfile.backend .
-docker push huu/monitoring-backend:v1
-# (tương tự frontend)
-
-# 2. SSH vào EC2
+# 1. SSH vào EC2
 ssh -i key.pem ubuntu@<ec2-ip>
 
-# 3. Pull images + chạy docker-compose
-docker-compose -f docker-compose.prod.yml up -d
+# 2. Install docker + compose
+sudo apt-get update && sudo apt-get install -y docker.io docker-compose-plugin
 
-# 4. Setup RDS endpoint trong .env
-# 5. Run migrations: docker exec backend alembic upgrade head
+# 3. Copy compose + .env.prod lên EC2 (scp hoặc clone repo nhưng chỉ cần infra/)
+scp -i key.pem infra/docker-compose.prod.yml infra/.env.prod ubuntu@<ec2-ip>:~/
+
+# 4. Pull image từ GHCR (public, không cần login) + override image tag trỏ GHCR
+#    Sửa compose.prod để dùng `image: ghcr.io/minhnguyen1007/sepsis-backend:latest`
+#    thay vì `build:` block.
+
+# 5. Run
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+
+# 6. Bootstrap MLflow alias (1 lần): chạy train từ máy dev push lên EC2 MLflow,
+#    hoặc copy mlflow.db từ local lên EC2 volume.
+
+# 7. RDS: thay DATABASE_URL trong .env.prod trỏ RDS endpoint, bỏ service postgres khỏi compose.
 ```
 
 ## Code conventions
