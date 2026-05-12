@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Numeric values: tabular-nums giúp số liệu vital signs align thẳng cột. */
+@layer base {
+  table,
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}

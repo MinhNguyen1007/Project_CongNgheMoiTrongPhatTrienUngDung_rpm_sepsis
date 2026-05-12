@@ -1,0 +1,47 @@
+# =============================================================================
+# requirements.txt — 1 venv chung cho ML + Backend + Streaming
+# Frontend dùng npm riêng trong frontend/
+# =============================================================================
+
+# --- Core data / ML ---
+numpy>=1.26,<2.0
+pandas>=2.2,<3.0
+scikit-learn>=1.4,<2.0
+xgboost>=2.0,<3.0
+scipy>=1.12
+
+# --- Experiment tracking + drift ---
+mlflow>=2.11,<3.0
+evidently>=0.4.25,<0.5
+
+# --- Backend (FastAPI + async stack) ---
+fastapi>=0.110,<0.120
+uvicorn[standard]>=0.27
+pydantic>=2.6
+pydantic-settings>=2.2
+sqlalchemy>=2.0,<3.0
+asyncpg>=0.29
+alembic>=1.13
+python-multipart>=0.0.9
+websockets>=12.0
+
+# --- Streaming ---
+kafka-python>=2.0,<3.0
+
+# --- Scheduler ---
+apscheduler>=3.10,<4.0
+
+# --- Notebook / EDA ---
+jupyter>=1.0
+matplotlib>=3.8
+seaborn>=0.13
+
+# --- Dev / test ---
+pytest>=8.0
+pytest-asyncio>=0.23
+httpx>=0.27
+ruff>=0.4
+black>=24.0
+
+# --- Config ---
+python-dotenv>=1.0

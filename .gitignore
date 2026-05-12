@@ -1,96 +1,59 @@
-# ── Python ──────────────────────────────────────────────
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-build/
-dist/
 *.egg-info/
-.venv/
-venv/
 .pytest_cache/
-.mypy_cache/
 .ruff_cache/
-htmlcov/
-.coverage
-coverage.xml
+.mypy_cache/
 
-# ── Node / Frontend ─────────────────────────────────────
+# Virtual env (1 venv chung cho cả project)
+venv/
+.venv/
+env/
+
+# Data + ML artifacts (KHÔNG commit dataset PhysioNet, model files, MLflow store)
+ml/data/training_setA/
+ml/data/training_setB/
+ml/data/*.csv
+ml/data/*.parquet
+ml/mlruns/
+mlruns/
+mlartifacts/
+*.pkl
+*.joblib
+*.bin
+*.model
+
+# Notebook output (clear trước khi commit)
+.ipynb_checkpoints/
+
+# Frontend
 node_modules/
 dist/
 .vite/
-*.local
-.npm
-.eslintcache
 
-# ── Data (KHÔNG commit dataset) ─────────────────────────
-data/raw/
-data/processed/
-data/interim/
-data/features/
-data/features_relabeled/
-*.psv
-*.parquet
-*.csv
-*.rar
-*.zip
-!data/samples/*.csv            # cho phép sample nhỏ cho test
-!tests/**/*.csv
-!reports/load/baseline_stats.csv
-
-# ── ML artifacts ────────────────────────────────────────
-mlruns/
-mlartifacts/
-artifacts/
-ml/kaggle/output/
-mlops/drift/reports/
-*.pkl
-*.pt
-*.pth
-*.onnx
-*.h5
-*.cbm
-
-# ── Docker / infra ──────────────────────────────────────
-.docker/
-volumes/
-localstack-data/
-
-# ── Secrets ─────────────────────────────────────────────
+# Env / secrets
 .env
-.env.*
-!.env.example
+.env.local
 *.pem
 *.key
-credentials*.json
 
-# ── Claude Code ─────────────────────────────────────────
-.claude/settings.local.json
-.claude/mcp.json
-.claude/memory/
-
-# ── IDE ─────────────────────────────────────────────────
-.vscode/*
-!.vscode/settings.json.example
-!.vscode/extensions.json
+# IDE
 .idea/
+.vscode/settings.json
 *.swp
-*.swo
 
-# ── OS ──────────────────────────────────────────────────
+# OS
 .DS_Store
 Thumbs.db
-desktop.ini
 
-# ── Report build artifacts ──────────────────────────────
-docs/report/*.pdf
-docs/report/*.aux
-docs/report/*.log
-docs/report/*.out
-docs/report/*.toc
+# Logs
+*.log
+logs/
 
-# ── Misc ────────────────────────────────────────────────
-.notes.md
-scratch/
-tmp/
+# Docker volumes (nếu mount local)
+infra/data/
+infra/postgres-data/
