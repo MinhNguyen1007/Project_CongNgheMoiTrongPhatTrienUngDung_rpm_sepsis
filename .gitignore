@@ -38,6 +38,8 @@ dist/
 # Env / secrets
 .env
 .env.local
+.env.prod
+infra/.env.prod
 *.pem
 *.key
 

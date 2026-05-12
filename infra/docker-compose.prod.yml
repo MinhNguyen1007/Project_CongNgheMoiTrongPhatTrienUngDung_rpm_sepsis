@@ -1,0 +1,162 @@
+# infra/docker-compose.prod.yml
+#
+# Full stack: postgres + kafka + mlflow + backend + frontend.
+# Khác `docker-compose.yml` (dev): có backend/frontend/mlflow + Kafka multi-listener.
+#
+# ----- Lệnh hay dùng -----
+# Build + start:
+#   docker compose -f infra/docker-compose.prod.yml --env-file infra/.env.prod up -d --build
+# Status:
+#   docker compose -f infra/docker-compose.prod.yml ps
+# Log backend:
+#   docker compose -f infra/docker-compose.prod.yml logs -f backend
+# Stop + xoá:
+#   docker compose -f infra/docker-compose.prod.yml down            # giữ volume
+#   docker compose -f infra/docker-compose.prod.yml down -v         # xoá data
+#
+# ----- Bootstrap lần đầu (1 lần sau khi MLflow container up) -----
+# 1. Train + register model lên MLflow container (chạy trên host):
+#      MLFLOW_TRACKING_URI=http://localhost:5000 python -m ml.src.train --register
+# 2. Mở http://localhost:5000 → Models → sepsis-predictor → Version 1 → Add alias `production`.
+# 3. Restart backend để load model:
+#      docker compose -f infra/docker-compose.prod.yml restart backend
+#
+# Alembic migration tự chạy mỗi lần backend container start (idempotent).
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: sepsis-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-monitoring}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-monitoring}
+      POSTGRES_DB: ${POSTGRES_DB:-monitoring}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-monitoring} -d ${POSTGRES_DB:-monitoring}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: sepsis-kafka
+    ports:
+      # EXTERNAL listener cho host process (producer streaming chạy host).
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      # WHY multi-listener: container-to-container resolve hostname `kafka`,
+      # host-to-container resolve `localhost`. Phải advertise cả 2.
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      # Heap nhỏ cho EC2 t3.micro 1GB. Local dev cũng OK.
+      KAFKA_HEAP_OPTS: "-Xmx512m -Xms256m"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  mlflow:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.mlflow
+    container_name: sepsis-mlflow
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_data:/mlflow
+    healthcheck:
+      # MLflow expose /health từ 2.0+.
+      test: ["CMD-SHELL", "python -c \"import urllib.request, sys; sys.exit(0 if urllib.request.urlopen('http://localhost:5000/health').status==200 else 1)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+
+  backend:
+    build:
+      # Build context = project root để copy được backend/ ml/ streaming/ requirements.txt.
+      context: ..
+      dockerfile: infra/Dockerfile.backend
+    container_name: sepsis-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+    environment:
+      # Override hostname để container-to-container.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-monitoring}:${POSTGRES_PASSWORD:-monitoring}@postgres:5432/${POSTGRES_DB:-monitoring}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_TOPIC_VITALS: ${KAFKA_TOPIC_VITALS:-patient-vitals}
+      KAFKA_CONSUMER_GROUP: ${KAFKA_CONSUMER_GROUP:-backend-consumer}
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MODEL_NAME: ${MODEL_NAME:-sepsis-predictor}
+      MODEL_ALIAS: ${MODEL_ALIAS:-production}
+      MODEL_THRESHOLD: ${MODEL_THRESHOLD:-0.70}
+      # WHY *: nginx proxy nên Origin sẽ là chính frontend host. Để đơn giản
+      # cho demo, accept *. Production AWS đặt domain cụ thể.
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-*}
+      DRIFT_FEATURES_THRESHOLD: ${DRIFT_FEATURES_THRESHOLD:-0.30}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      # Expose để debug trực tiếp (curl http://localhost:8000/api/...).
+      # Frontend production-traffic đi qua nginx :80, không cần port này.
+      - "8000:8000"
+    volumes:
+      # Read-only mount data PhysioNet cho retrain subprocess.
+      - ../ml/data:/app/ml/data:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/models/current/info || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.frontend
+      # WHY build args: Vite bake env tại build time. Đổi hostname → rebuild.
+      args:
+        VITE_API_URL: ""
+        VITE_WS_URL: "ws://localhost/ws/predictions"
+    container_name: sepsis-frontend
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  kafka_data:
+  mlflow_data:

@@ -1,0 +1,39 @@
+# Backend = FastAPI + Kafka consumer thread + APScheduler.
+# Runtime: 1 process. Migration alembic chạy trước uvicorn (idempotent).
+#
+# Build context = project root (chứa backend/, ml/, streaming/, requirements.txt).
+#   docker build -f infra/Dockerfile.backend -t sepsis-backend .
+
+FROM python:3.11-slim AS runtime
+
+# WHY system deps: asyncpg cần libpq + build-essential (compile C ext);
+# xgboost cần libgomp1 (OpenMP runtime). curl cho healthcheck.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        libpq-dev \
+        libgomp1 \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Layer cache: copy requirements riêng, install trước source code.
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy source. ml/ + streaming/ cần cho retrain subprocess + import path.
+COPY backend/ ./backend/
+COPY ml/ ./ml/
+COPY streaming/ ./streaming/
+COPY alembic.ini ./
+
+# WHY PYTHONPATH=/app: alembic env.py + retrain CLI (`python -m ml.src.retrain`)
+# import từ root. PYTHONUNBUFFERED để log ra ngay không buffer.
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    PYTHONDONTWRITEBYTECODE=1
+
+EXPOSE 8000
+
+# WHY sh -c: cần chain alembic + uvicorn. Migration auto mỗi start (an toàn vì idempotent).
+CMD ["sh", "-c", "alembic upgrade head && uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --ws-ping-interval 25"]

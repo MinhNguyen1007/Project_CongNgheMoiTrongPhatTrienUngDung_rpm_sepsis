@@ -30,8 +30,8 @@ Hệ thống Giám sát Bệnh nhân Từ xa với Streaming + MLOps. Đồ án 
 | T3    | ✅ Done    | Postgres + Alembic + FastAPI skeleton (5 routers), SQLAlchemy 2.0 async, ORM cho 5 bảng, MLflow alias-based loader.       |
 | T4    | ✅ Done    | Kafka KRaft (`apache/kafka:3.7.0`), producer streaming PSV, consumer thread + WS broadcast.                              |
 | T5    | ✅ Done    | React 18 + Vite + Tailwind + TanStack Query. Dashboard, PatientDetail (Chart.js timelines), ModelRegistry, DriftReports.   |
-| T6    | 🚧 In progress | `drift_detect.py` (Evidently), `retrain.py` (pull DB + train + promote alias), APScheduler jobs. Hook lifespan + test.  |
-| T7    | ⬜ Todo    | Dockerize backend/frontend, GitHub Actions CI/CD, AWS deploy.                                                              |
+| T6    | ✅ Done    | `drift_detect.py` (Evidently, NaN-safe filter), `retrain.py` (pull DB + train + promote-on-better-AUROC guard), APScheduler hook lifespan, manual triggers `POST /api/drift/check` + `POST /api/models/retrain`, 9 pytest. Subprocess dùng `asyncio.to_thread` (Windows compat). |
+| T7    | 🚧 In progress | Dockerize backend/frontend, GitHub Actions CI/CD, AWS deploy.                                                              |
 | CN    | ⬜ Todo    | Polish UI, viết báo cáo, record demo.                                                                                     |
 
 **Baseline AUROC: 0.838, AUPRC: 0.110, Utility: 0.825 @ thr=0.70** (full ~40k patient, MLflow registered alias `production`, version 1).
@@ -253,8 +253,8 @@ python -m streaming.dev_predict_smoke --patient p000009 --hours 60
 | **T3** | ✅ Done         | Postgres + Alembic, FastAPI skeleton, 5 REST endpoint, MLflow alias-based loader, ML inference (`PatientBuffer`)            |
 | **T4** | ✅ Done         | Kafka KRaft local, producer interleave + rate, consumer thread, save DB, WebSocket broadcast                                |
 | **T5** | ✅ Done         | React + Vite + Tailwind. Dashboard (list/alerts/stats), PatientDetail (vital + risk charts), ModelInfo, DriftReports        |
-| **T6** | 🚧 In progress | Evidently drift detect, retrain orchestrator, APScheduler jobs, manual trigger endpoints                                    |
-| **T7** | ⬜ Todo         | Dockerize, GitHub Actions, deploy AWS EC2 + RDS                                                                              |
+| **T6** | ✅ Done         | Evidently drift detect, retrain orchestrator, APScheduler jobs daily/weekly, manual trigger endpoints, 9 pytest, smoke test full chain |
+| **T7** | 🚧 In progress | Dockerize, GitHub Actions, deploy AWS EC2 + RDS                                                                              |
 | **CN** | ⬜ Todo         | Polish UI, viết báo cáo, record demo video                                                                                  |
 
 ## Database schema

@@ -1,0 +1,43 @@
+# Frontend = Vite static build → nginx serve.
+# Vite bake env vào bundle ở build time → cần ARG, không phải ENV runtime.
+#
+# Build context = project root.
+#   docker build -f infra/Dockerfile.frontend \
+#     --build-arg VITE_API_URL="" \
+#     --build-arg VITE_WS_URL="ws://localhost/ws/predictions" \
+#     -t sepsis-frontend .
+
+# ---- Stage 1: build ----
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Layer cache: install deps trước copy source.
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+
+COPY frontend/ ./
+
+# WHY ARG: Vite snapshot env tại build time vào JS bundle. Override khi
+# build cho môi trường khác (AWS hostname).
+# VITE_API_URL="" → axios baseURL rỗng, request relative same-origin → nginx proxy /api/.
+# VITE_WS_URL=ws://localhost/... → WebSocket constructor cần full URL với scheme.
+ARG VITE_API_URL=""
+ARG VITE_WS_URL="ws://localhost/ws/predictions"
+ENV VITE_API_URL=$VITE_API_URL \
+    VITE_WS_URL=$VITE_WS_URL
+
+RUN npm run build
+
+# ---- Stage 2: runtime ----
+FROM nginx:1.27-alpine AS runtime
+
+# Override default config bằng SPA + proxy config của ta.
+COPY infra/nginx.conf /etc/nginx/conf.d/default.conf
+
+# Static từ Vite build.
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+# nginx default CMD đủ; không override.
