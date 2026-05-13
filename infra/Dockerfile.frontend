@@ -4,7 +4,7 @@
 # Build context = project root.
 #   docker build -f infra/Dockerfile.frontend \
 #     --build-arg VITE_API_URL="" \
-#     --build-arg VITE_WS_URL="ws://localhost/ws/predictions" \
+#     --build-arg VITE_WS_URL="/ws/predictions" \
 #     -t sepsis-frontend .
 
 # ---- Stage 1: build ----
@@ -18,12 +18,12 @@ RUN npm ci
 
 COPY frontend/ ./
 
-# WHY ARG: Vite snapshot env tại build time vào JS bundle. Override khi
-# build cho môi trường khác (AWS hostname).
-# VITE_API_URL="" → axios baseURL rỗng, request relative same-origin → nginx proxy /api/.
-# VITE_WS_URL=ws://localhost/... → WebSocket constructor cần full URL với scheme.
+# WHY ARG: Vite snapshot env tại build time vào JS bundle.
+# VITE_API_URL="" → axios baseURL rỗng → same-origin → nginx proxy /api/.
+# VITE_WS_URL="/ws/predictions" → path-only, WebSocketContext.resolveWsUrl ghép
+# window.location.host runtime → 1 image dùng được cho localhost + EC2 IP.
 ARG VITE_API_URL=""
-ARG VITE_WS_URL="ws://localhost/ws/predictions"
+ARG VITE_WS_URL="/ws/predictions"
 ENV VITE_API_URL=$VITE_API_URL \
     VITE_WS_URL=$VITE_WS_URL
 

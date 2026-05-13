@@ -12,12 +12,23 @@ type Status = "connecting" | "open" | "closed";
 
 const WebSocketContext = createContext<{ status: Status }>({ status: "connecting" });
 
+// WHY resolveWsUrl: VITE_WS_URL bake tại build time. Image build trong CI dùng
+// ws://localhost/... → trên EC2 IP khác, browser load index → JS connect localhost FAIL.
+// Giải pháp: nếu env là path-only ("/ws/...") thì resolve runtime theo window.location.
+// → 1 image dùng được cho localhost + bất kỳ EC2 IP/domain.
+function resolveWsUrl(envUrl: string): string {
+  if (envUrl.startsWith("ws://") || envUrl.startsWith("wss://")) return envUrl;
+  const scheme = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const path = envUrl.startsWith("/") ? envUrl : `/${envUrl}`;
+  return `${scheme}//${window.location.host}${path}`;
+}
+
 export function WebSocketProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const { push } = useAlertsContext();
 
   const { status } = useWebSocket<WSPredictionEvent>({
-    url: import.meta.env.VITE_WS_URL,
+    url: resolveWsUrl(import.meta.env.VITE_WS_URL),
     onMessage: (event) => {
       // WHY invalidate: list patient + alerts dùng React Query cache. Khi có
       // prediction mới, invalidate để hook refetch. Throttle ko cần vì backend

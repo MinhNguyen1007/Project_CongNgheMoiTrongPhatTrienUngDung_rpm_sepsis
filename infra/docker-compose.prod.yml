@@ -143,7 +143,7 @@ services:
       # WHY build args: Vite bake env tại build time. Đổi hostname → rebuild.
       args:
         VITE_API_URL: ""
-        VITE_WS_URL: "ws://localhost/ws/predictions"
+        VITE_WS_URL: "/ws/predictions"
     container_name: sepsis-frontend
     depends_on:
       - backend

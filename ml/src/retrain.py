@@ -43,6 +43,7 @@ from ml.src.preprocess import (
     load_psv_files,
     split_train_val,
 )
+from ml.src.s3_sync import ensure_data_dirs
 from ml.src.train import train_model
 
 logger = logging.getLogger(__name__)
@@ -139,7 +140,8 @@ async def run(reason: str, hours_from_db: int, max_patients: int | None) -> dict
     """Full retrain pipeline. Return JSON dict."""
     logger.info("Retrain start, reason=%s, hours_from_db=%d", reason, hours_from_db)
 
-    # 1. Load training data baseline.
+    # 1. Load training data baseline. Pull từ S3 nếu local trống (AWS deploy).
+    ensure_data_dirs(DEFAULT_DATA_DIRS)
     base_df = load_psv_files(DEFAULT_DATA_DIRS, max_patients=max_patients)
     logger.info(
         "Baseline data: %d rows, %d patients", len(base_df), base_df["patient_id"].nunique()

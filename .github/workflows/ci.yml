@@ -139,11 +139,12 @@ jobs:
           context: .
           file: infra/Dockerfile.frontend
           push: true
-          # WHY build-args: Vite bake env vào bundle. CI build mặc định cho local
-          # demo; deploy AWS sau rebuild với hostname thực.
+          # WHY build-args path-only: WebSocketContext.resolveWsUrl sẽ ghép
+          # window.location.host runtime → 1 image chạy được cả localhost + EC2 IP.
+          # VITE_API_URL rỗng → axios same-origin → nginx proxy /api/.
           build-args: |
             VITE_API_URL=
-            VITE_WS_URL=ws://localhost/ws/predictions
+            VITE_WS_URL=/ws/predictions
           tags: |
             ghcr.io/${{ env.OWNER_LC }}/sepsis-frontend:latest
             ghcr.io/${{ env.OWNER_LC }}/sepsis-frontend:${{ github.sha }}
