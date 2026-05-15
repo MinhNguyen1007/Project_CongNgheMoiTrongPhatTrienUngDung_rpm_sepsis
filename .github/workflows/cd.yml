@@ -1,0 +1,31 @@
+# CD workflow — deploy lên EC2 sau khi CI pass.
+#
+# Trigger: CI workflow hoàn thành thành công trên main.
+# Job: SSH vào EC2, pull image mới từ GHCR, restart containers.
+
+name: CD
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    # WHY check conclusion: workflow_run trigger fired cả khi CI fail.
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: SSH & deploy
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/
+            docker compose -f docker-compose.aws.yml pull
+            docker compose -f docker-compose.aws.yml up -d --remove-orphans
+            docker image prune -f
