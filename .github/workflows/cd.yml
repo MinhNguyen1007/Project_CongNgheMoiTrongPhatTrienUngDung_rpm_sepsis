@@ -26,6 +26,6 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd ~/
-            docker compose -f docker-compose.aws.yml pull
-            docker compose -f docker-compose.aws.yml up -d --remove-orphans
+            docker compose -f docker-compose.aws.yml --env-file .env.prod pull
+            docker compose -f docker-compose.aws.yml --env-file .env.prod up -d --remove-orphans
             docker image prune -f
