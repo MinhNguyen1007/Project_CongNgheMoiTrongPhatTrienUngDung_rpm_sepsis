@@ -21,10 +21,13 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
-def ensure_data_dirs(data_dirs: list[Path | str]) -> None:
+def ensure_data_dirs(data_dirs: list[Path | str], max_files: int | None = 2000) -> None:
     """Đảm bảo các thư mục data có .psv. Nếu trống và có S3_DATA_BUCKET → download.
 
     Idempotent: chạy lại trên dir đã có data sẽ skip.
+
+    WHY max_files=2000: EC2 t3.micro 1GB RAM — download full 20k files/set quá
+    chậm và tốn bộ nhớ. 2000 patients đủ để retrain có ý nghĩa thống kê.
     """
     bucket = os.getenv("S3_DATA_BUCKET")
     if not bucket:
@@ -49,19 +52,23 @@ def ensure_data_dirs(data_dirs: list[Path | str]) -> None:
 
         # Object key prefix tương ứng folder cuối (training_setA hoặc training_setB).
         s3_prefix = f"{prefix}{d.name}/"
-        logger.info("Downloading s3://%s/%s → %s", bucket, s3_prefix, d)
+        logger.info("Downloading s3://%s/%s → %s (max_files=%s)", bucket, s3_prefix, d, max_files)
 
         try:
             paginator = s3.get_paginator("list_objects_v2")
             count = 0
             for page in paginator.paginate(Bucket=bucket, Prefix=s3_prefix):
                 for obj in page.get("Contents", []):
+                    if max_files is not None and count >= max_files:
+                        break
                     key = obj["Key"]
                     fname = Path(key).name
                     if not fname.endswith(".psv"):
                         continue
                     s3.download_file(bucket, key, str(d / fname))
                     count += 1
+                if max_files is not None and count >= max_files:
+                    break
             logger.info("Downloaded %d files into %s", count, d)
             if count == 0:
                 raise FileNotFoundError(f"No .psv objects under s3://{bucket}/{s3_prefix}")

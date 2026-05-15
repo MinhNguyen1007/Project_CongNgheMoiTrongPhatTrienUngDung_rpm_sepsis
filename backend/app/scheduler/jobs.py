@@ -117,8 +117,10 @@ async def run_retrain(reason: str = "manual") -> dict:
     WHY reload sau promote: backend cache model in-memory (loader.py), nếu
     không reload thì vẫn dùng version cũ cho đến khi restart.
     """
+    # WHY --max-patients 2000: EC2 t3.micro 1GB RAM + slow S3 download → limit
+    # baseline to 2000 patients để tránh timeout. Đủ để compare AUROC.
     rc, stdout, stderr = await _run_subprocess(
-        ["-m", "ml.src.retrain", "--reason", reason],
+        ["-m", "ml.src.retrain", "--reason", reason, "--max-patients", "2000"],
         timeout=1800,
     )
     if rc != 0:
