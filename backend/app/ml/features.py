@@ -137,18 +137,36 @@ def compute_features(
     """
     feats: dict[str, float] = {}
 
-    # Raw vitals
+    # --- Thứ tự phải KHỚP preprocess.feature_engineering() ---
+    # preprocess.py: original cols (vitals, labs, demographics) giữ nguyên,
+    # rồi append rolling, rồi missing_flag+ffill, rồi n_features_missing.
+
+    # 1) Raw vitals (8)
     for col in VITAL_COLS:
         feats[col] = _safe_float(current_row.get(col))
 
-    # Rolling stats (window=6h). Lấy từ history deque.
+    # 2) Raw labs (26)
+    n_missing = 0
+    for col in VITAL_COLS:
+        if _is_nan(current_row.get(col)):
+            n_missing += 1
+    lab_raw_missing: list[tuple[str, float | None]] = []
+    for col in LAB_COLS:
+        raw = current_row.get(col)
+        feats[col] = _safe_float(raw)
+        lab_raw_missing.append((col, raw))
+        if _is_nan(raw):
+            n_missing += 1
+
+    # 3) Demographics (6)
+    for col in DEMO_COLS:
+        feats[col] = _safe_float(demographics.get(col))
+
+    # 4) Rolling stats per vital (8×3 = 24)
     hist_list = list(state.history)
-    window = hist_list[-ROLLING_WINDOW:]  # tối đa 6 row cuối, có thể ít hơn
+    window = hist_list[-ROLLING_WINDOW:]
     for col in VITAL_COLS:
         values = np.array([_safe_float(r.get(col)) for r in window], dtype=np.float64)
-        # nanmean/std bỏ qua NaN; nếu toàn NaN → trả NaN. Suppress cosmetic
-        # "Mean of empty slice" / "Degrees of freedom <= 0" — đây là behavior
-        # mong muốn, không phải lỗi.
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=RuntimeWarning)
             feats[f"{col}_roll_mean_6h"] = (
@@ -157,8 +175,6 @@ def compute_features(
             feats[f"{col}_roll_std_6h"] = (
                 float(np.nanstd(values, ddof=1)) if values.size > 1 else float("nan")
             )
-
-        # Delta: current - previous (lùi 1 giờ).
         if len(hist_list) >= 2:
             prev = _safe_float(hist_list[-2].get(col))
             curr = _safe_float(current_row.get(col))
@@ -166,26 +182,15 @@ def compute_features(
         else:
             feats[f"{col}_delta"] = float("nan")
 
-    # Labs raw + ffill + missing flag
-    n_missing = 0
-    for col in VITAL_COLS:
-        if _is_nan(current_row.get(col)):
-            n_missing += 1
-
-    for col in LAB_COLS:
-        raw = current_row.get(col)
-        feats[col] = _safe_float(raw)
+    # 5) Lab missing_flag + ffill (26×2 = 52)
+    for col, raw in lab_raw_missing:
         feats[f"{col}_missing_flag"] = 1.0 if _is_nan(raw) else 0.0
         if _is_nan(raw):
-            n_missing += 1
             feats[f"{col}_ffill"] = state.last_labs.get(col, float("nan"))
         else:
             feats[f"{col}_ffill"] = float(raw)
 
-    # Demographics (raw, không transform)
-    for col in DEMO_COLS:
-        feats[col] = _safe_float(demographics.get(col))
-
+    # 6) Aggregate missing count (1)
     feats["n_features_missing"] = float(n_missing)
     return feats
 
