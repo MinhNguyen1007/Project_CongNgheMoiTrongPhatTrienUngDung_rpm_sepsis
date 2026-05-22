@@ -252,7 +252,6 @@ def train_model(
         else:
             raise ValueError(f"Unknown model_type: {model_type}")
 
-        y_val = val_df[TARGET_COL].to_numpy(dtype=np.int8)
         metrics = compute_metrics(val_df, y_score, threshold=threshold)
         mlflow.log_metrics({k: v for k, v in metrics.items() if isinstance(v, int | float)})
 
