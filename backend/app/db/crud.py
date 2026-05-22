@@ -53,6 +53,7 @@ async def upsert_vital(
     vitals: dict[str, float | None],
     lab_values: dict[str, float | None] | None,
     sepsis_label: int | None,
+    is_validated: bool = True,
 ) -> None:
     """Idempotent insert vital. Conflict trên (patient_id, hour) → update.
 
@@ -72,6 +73,7 @@ async def upsert_vital(
         etco2=vitals.get("EtCO2"),
         lab_values=lab_values,
         sepsis_label=sepsis_label,
+        is_validated=is_validated,
     )
     stmt = stmt.on_conflict_do_update(
         index_elements=["patient_id", "hour"],
@@ -86,6 +88,7 @@ async def upsert_vital(
             "etco2": stmt.excluded.etco2,
             "lab_values": stmt.excluded.lab_values,
             "sepsis_label": stmt.excluded.sepsis_label,
+            "is_validated": stmt.excluded.is_validated,
         },
     )
     await session.execute(stmt)
@@ -279,6 +282,7 @@ async def upsert_model_version(
     utility: float | None = None,
     threshold: float | None = None,
     status: str = "staging",
+    model_type: str | None = None,
 ) -> None:
     """Idempotent — gọi sau khi retrain register version + promote alias.
 
@@ -293,6 +297,7 @@ async def upsert_model_version(
         utility=utility,
         threshold=threshold,
         status=status,
+        model_type=model_type,
     )
     stmt = stmt.on_conflict_do_update(
         index_elements=["version"],
@@ -302,6 +307,7 @@ async def upsert_model_version(
             "utility": stmt.excluded.utility,
             "threshold": stmt.excluded.threshold,
             "status": stmt.excluded.status,
+            "model_type": stmt.excluded.model_type,
         },
     )
     await session.execute(stmt)

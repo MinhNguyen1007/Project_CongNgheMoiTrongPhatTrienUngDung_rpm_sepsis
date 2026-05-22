@@ -142,6 +142,7 @@ async def run_retrain(reason: str = "manual") -> dict:
             utility=result["new_utility"],
             threshold=result["new_threshold"],
             status="production" if result["promoted"] else "staging",
+            model_type=result.get("best_model_type"),
         )
         await session.commit()
 

@@ -1,11 +1,10 @@
-"""Load + cache XGBoost model từ MLflow Registry.
+"""Load + cache model từ MLflow Registry (model-agnostic via pyfunc).
+
+WHY pyfunc thay vì mlflow.xgboost: hỗ trợ XGBoost, LightGBM, RandomForest
+qua cùng interface. predict() trả probability cho mọi model type.
 
 WHY cache in-memory: predict gọi mỗi message Kafka (~1/giây/patient). Load từ
 MLflow tracking server mất 200-500ms/lần → không thể load mỗi request.
-
-WHY alias thay vì stage: MLflow 2.9+ deprecate stage (xem `models:/.../@alias`).
-Khi retrain job promote version mới, alias `production` trỏ sang version mới
-→ gọi `reload_model()` để swap cache.
 """
 
 from __future__ import annotations
@@ -15,8 +14,7 @@ import threading
 from dataclasses import dataclass
 
 import mlflow
-import mlflow.xgboost
-import xgboost as xgb
+import mlflow.pyfunc
 from mlflow.tracking import MlflowClient
 
 from backend.app.config import settings
@@ -28,40 +26,48 @@ logger = logging.getLogger(__name__)
 class LoadedModel:
     """In-memory model + metadata. Immutable — reload swap whole struct."""
 
-    booster: xgb.Booster
+    model: mlflow.pyfunc.PyFuncModel
     feature_names: list[str]
-    version: str  # MLflow version (vd: '1', '2', '3')
+    version: str
     threshold: float
+    model_type: str
 
 
-# Single global cache. Thread-safe via _lock vì consumer thread + scheduler
-# thread + FastAPI worker đều có thể đọc/swap.
 _model: LoadedModel | None = None
 _lock = threading.RLock()
 
 
 def _load_from_registry() -> LoadedModel:
-    """Fetch model từ MLflow Registry theo alias."""
+    """Fetch model từ MLflow Registry theo alias (model-agnostic)."""
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
     client = MlflowClient(tracking_uri=settings.mlflow_tracking_uri)
 
-    # Resolve alias → version. URI dạng models:/<name>@<alias>.
     mv = client.get_model_version_by_alias(name=settings.model_name, alias=settings.model_alias)
     model_uri = f"models:/{settings.model_name}@{settings.model_alias}"
     logger.info("Loading model %s (version=%s, run_id=%s)", model_uri, mv.version, mv.run_id)
 
-    booster: xgb.Booster = mlflow.xgboost.load_model(model_uri)
-    feature_names = list(booster.feature_names or [])
-    if not feature_names:
+    model = mlflow.pyfunc.load_model(model_uri)
+
+    # Feature names từ signature (bắt buộc log signature khi train).
+    sig = model.metadata.signature
+    if sig and sig.inputs:
+        feature_names = [inp.name for inp in sig.inputs.inputs]
+    else:
         raise RuntimeError(
-            "Loaded XGBoost model has no feature_names. Re-train with feature_names set."
+            "Model has no input signature — cannot determine feature names. "
+            "Re-train with signature=infer_signature(...)."
         )
 
+    # Model type từ MLflow run tag.
+    run = client.get_run(mv.run_id)
+    model_type = run.data.tags.get("model_type", "xgboost")
+
     return LoadedModel(
-        booster=booster,
+        model=model,
         feature_names=feature_names,
         version=str(mv.version),
         threshold=settings.model_threshold,
+        model_type=model_type,
     )
 
 
@@ -81,5 +87,5 @@ def reload_model() -> LoadedModel:
         new_model = _load_from_registry()
         old_version = _model.version if _model else "None"
         _model = new_model
-        logger.info("Model reloaded: %s → %s", old_version, new_model.version)
+        logger.info("Model reloaded: %s → %s (%s)", old_version, new_model.version, new_model.model_type)
         return new_model

@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     # Drift
     drift_features_threshold: float = 0.3
 
+    # Scheduler
+    enable_scheduler: bool = True
+
     # Logging
     log_level: str = "INFO"
 

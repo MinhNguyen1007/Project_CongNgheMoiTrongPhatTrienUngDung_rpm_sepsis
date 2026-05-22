@@ -52,6 +52,7 @@ async def get_current_info() -> dict[str, object]:
         "version": m.version,
         "threshold": m.threshold,
         "n_features": len(m.feature_names),
+        "model_type": m.model_type,
     }
 
 

@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from backend.app.api import drift, models, patients, predictions, websocket
 from backend.app.config import settings
@@ -53,14 +54,20 @@ async def lifespan(app: FastAPI):
 
     # Start APScheduler (drift daily + retrain weekly). Chạy chung event loop
     # với FastAPI — job dùng subprocess nên không block.
-    scheduler = create_scheduler()
-    scheduler.start()
-    app.state.scheduler = scheduler
+    if settings.enable_scheduler:
+        scheduler = create_scheduler()
+        scheduler.start()
+        app.state.scheduler = scheduler
+        logger.info("Scheduler started (drift daily 2AM, retrain Sun 3AM)")
+    else:
+        app.state.scheduler = None
+        logger.info("Scheduler DISABLED (ENABLE_SCHEDULER=false)")
 
     yield
 
     logger.info("Backend shutting down")
-    scheduler.shutdown(wait=False)
+    if app.state.scheduler:
+        app.state.scheduler.shutdown(wait=False)
     consumer_thread.stop()
     consumer_thread.join(timeout=10)
     await engine.dispose()
@@ -79,6 +86,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+Instrumentator().instrument(app).expose(app, endpoint="/metrics", tags=["meta"])
 
 # Routers
 app.include_router(patients.router)

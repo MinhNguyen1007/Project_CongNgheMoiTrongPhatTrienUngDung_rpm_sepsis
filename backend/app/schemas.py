@@ -46,6 +46,7 @@ class VitalRecord(BaseModel):
     etco2: float | None
     lab_values: dict[str, Any] | None
     sepsis_label: int | None
+    is_validated: bool
     created_at: datetime
 
 
@@ -82,6 +83,7 @@ class ModelInfo(BaseModel):
     auprc: float | None
     utility: float | None
     threshold: float | None
+    model_type: str | None
     status: str
     created_at: datetime
 

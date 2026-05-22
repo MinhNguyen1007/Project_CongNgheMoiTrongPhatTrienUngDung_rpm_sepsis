@@ -61,9 +61,11 @@ async def _persist_and_broadcast(
 
         # Tách vitals (8 cột) và labs (26 cột) — labs gộp vào JSONB.
         from backend.app.ml.features import LAB_COLS, VITAL_COLS  # local import tránh vòng
+        from backend.app.streaming.validation import validate_vitals
 
         vital_only = {k: vitals.get(k) for k in VITAL_COLS}
         lab_only = {k: vitals.get(k) for k in LAB_COLS}
+        is_valid = validate_vitals(vital_only)
 
         await crud.upsert_vital(
             session,
@@ -72,6 +74,7 @@ async def _persist_and_broadcast(
             vitals=vital_only,
             lab_values=lab_only,
             sepsis_label=sepsis_label,
+            is_validated=is_valid,
         )
         await crud.upsert_prediction(
             session,

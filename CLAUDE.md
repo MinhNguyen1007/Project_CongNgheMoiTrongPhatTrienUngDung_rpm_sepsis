@@ -33,23 +33,36 @@ Hệ thống Giám sát Bệnh nhân Từ xa với Streaming + MLOps. Đồ án 
 | T6    | ✅ Done    | `drift_detect.py` (Evidently, NaN-safe filter), `retrain.py` (pull DB + train + promote-on-better-AUROC guard), APScheduler hook lifespan, manual triggers `POST /api/drift/check` + `POST /api/models/retrain`, 9 pytest. Subprocess dùng `asyncio.to_thread` (Windows compat). |
 | T7.1  | ✅ Done    | Dockerize full stack: 3 Dockerfile (backend slim+alembic+uvicorn, frontend multi-stage Vite→nginx proxy, mlflow SQLite+serve-artifacts), `docker-compose.prod.yml` 5 services + healthcheck + Kafka multi-listener fix, smoke E2E pass local. |
 | T7.2  | ✅ Done    | GitHub Actions CI (`.github/workflows/ci.yml`): 4 job lint (ruff+black) / test (9 pytest) / frontend (tsc) / build-push (3 image → `ghcr.io/minhnguyen1007/sepsis-{backend,frontend,mlflow}:{latest,sha}`). `pyproject.toml` ruff+black config line-length 100. |
-| T7.3  | 🚧 In progress | AWS EC2 t3.micro + RDS deploy, pull image từ GHCR (không build trên 1GB RAM).                                              |
-| CN    | ⬜ Todo    | Polish UI, viết báo cáo, record demo.                                                                                     |
+| T7.3  | ✅ Done    | AWS deploy: EC2 t3.micro `i-0091b979449a1f1a2` Ubuntu 24.04 + swap 4GB + Docker 29, EBS 20GB, Elastic IP `54.254.229.98`. 7 containers healthy: Kafka + MLflow + Backend + Frontend + Postgres + Prometheus + Grafana. RDS PG 16.13 `sepsis-db.c32ay6yiscn7.ap-southeast-1.rds.amazonaws.com`. Model AUROC 0.838 register + alias `production`. Frontend live tại `http://54.254.229.98`. **CD còn thủ công** (SSH → docker compose pull + up) — mai thêm GitHub Actions auto-deploy job. |
+| CN    | 🚧 WIP     | ✅ CD auto-deploy (`cd.yml` workflow_run → SSH pull+up EC2). ✅ Full pipeline demo được: stream → predict → alert → retrain → compare AUROC → promote/reject. ✅ Data validation (vital range check + `is_validated` flag), multi-model (XGBoost + LightGBM + RandomForest), scheduler toggle. ✅ Prometheus + Grafana monitoring (code done, deployed EC2: swap 4GB, port 3000 open, 7 containers). Còn: polish UI, viết báo cáo, record demo. **Khi resume:** start EC2 + RDS → chờ ~2 phút → containers tự restart. Set `$env:KAFKA_BOOTSTRAP_SERVERS="54.254.229.98:9092"` trước khi chạy producer. **AWS đang STOPPED (tiết kiệm chi phí) — start lại trước khi làm việc.** |
 
 **Baseline AUROC: 0.838, AUPRC: 0.110, Utility: 0.825 @ thr=0.70** (full ~40k patient, MLflow registered alias `production`, version 1).
+
+**EC2 gotchas (đã fix):**
+- `docker-compose.aws.yml` phải dùng `--env-file .env.prod` khi chạy compose (không auto-load)
+- Kafka `EXTERNAL` listener phải advertise `54.254.229.98:9092` (không phải `localhost`) để producer từ ngoài kết nối được
+- S3 sync giới hạn 2000 files/set (`s3_sync.py max_files=2000`) + retrain `--max-patients 2000` tránh OOM/timeout trên t3.micro
+- Port 9092 đã mở trên Security Group `sg-0d8fd628c391c5dd2`
+- Prometheus + Grafana: swap tăng lên 4GB, port 3000 mở trên SG, 7 containers (thêm prometheus + grafana). Grafana UI tại `http://54.254.229.98:3000` (admin/admin, anonymous viewer enabled)
 
 ## Kiến trúc
 
 ```
 Producer (.psv) → Kafka → Backend (FastAPI + Consumer)
-                                 ├─ Predict (XGBoost từ MLflow Registry)
-                                 ├─ Save Postgres
+                                 ├─ Validate vitals (clinical range check)
+                                 ├─ Predict (XGBoost/LightGBM/RF via MLflow pyfunc)
+                                 ├─ Save Postgres (mark is_validated=True/False)
+                                 ├─ /metrics → Prometheus → Grafana (dashboard)
                                  └─ WebSocket → Frontend (React)
 
-Scheduler (APScheduler trong backend):
+Scheduler (APScheduler trong backend, toggle via ENABLE_SCHEDULER env):
   - Daily 2AM: drift check (Evidently AI)
-  - Weekly Sun 3AM: retrain
-  - Auto-promote nếu AUROC mới > production
+  - Weekly Sun 3AM: retrain 3 model types → promote best AUROC
+  - Retrain chỉ dùng data is_validated=TRUE từ DB
+
+Monitoring:
+  - Prometheus scrape backend:8000/metrics mỗi 15s
+  - Grafana :3000 dashboard auto-provisioned (request rate, latency, errors, in-flight)
 ```
 
 ## Cấu trúc thư mục
@@ -65,7 +78,8 @@ Project/                          # = project root (cwd)
 │       ├── api/                  # patients, predictions, models, drift, websocket
 │       ├── db/                   # base, models (ORM), crud
 │       ├── ml/                   # loader (MLflow alias), features (PatientBuffer), predictor
-│       ├── streaming/consumer.py # Kafka consumer thread
+│       ├── streaming/consumer.py # Kafka consumer thread + vital validation
+│       ├── streaming/validation.py # Vital range check (8 vitals clinical range)
 │       ├── scheduler/jobs.py     # APScheduler jobs (T6)
 │       └── alembic/              # Migrations
 ├── frontend/                     # React + Vite - xem frontend/CLAUDE.md
@@ -85,11 +99,16 @@ Project/                          # = project root (cwd)
 │   └── dev_predict_smoke.py      # Smoke test predict pipeline (không cần Kafka)
 ├── infra/
 │   ├── docker-compose.yml        # Dev: Postgres 15 + Kafka 3.7 (apache/kafka)
-│   ├── docker-compose.prod.yml   # Prod: + backend + frontend + mlflow (5 services)
+│   ├── docker-compose.prod.yml   # Prod: 7 services (postgres+kafka+mlflow+backend+frontend+prometheus+grafana)
 │   ├── Dockerfile.backend        # python:3.11-slim + alembic + uvicorn
 │   ├── Dockerfile.frontend       # multi-stage Vite build → nginx
 │   ├── Dockerfile.mlflow         # mlflow 2.22 + SQLite + serve-artifacts
 │   ├── nginx.conf                # SPA fallback + reverse-proxy /api/ + /ws/
+│   ├── prometheus.yml            # Prometheus scrape config (backend:8000/metrics)
+│   ├── grafana/                  # Grafana provisioning + pre-built dashboard
+│   │   ├── provisioning/datasources/prometheus.yml
+│   │   ├── provisioning/dashboards/dashboards.yml
+│   │   └── dashboards/fastapi.json   # 7-panel dashboard (rate, latency, errors, etc.)
 │   └── .env.prod.example
 ├── .github/workflows/ci.yml      # T7.2: lint + pytest + frontend + build-push GHCR
 ├── venv/                         # 1 venv chung (gitignore)
@@ -105,15 +124,16 @@ Project/                          # = project root (cwd)
 * **Streaming:** `apache/kafka:3.7.0` (KRaft mode, no Zookeeper) + `kafka-python`
 * **Backend:** FastAPI 0.110+ + SQLAlchemy 2.0 async + asyncpg + Pydantic 2
 * **Frontend:** React 18 + Vite 5 + TypeScript + TailwindCSS 3 + Chart.js 4 (`react-chartjs-2`) + TanStack Query 5 + React Router 6
-* **ML:** XGBoost 2 + scikit-learn 1.4 + MLflow 2.22 (alias-based registry, **không dùng stage** vì deprecated)
+* **ML:** XGBoost 2 + LightGBM 4 + scikit-learn 1.4 (RandomForest) + MLflow 2.22 (alias-based registry, pyfunc loader model-agnostic)
 * **Drift:** Evidently AI 0.4+
 * **Scheduler:** APScheduler 3 async (chạy trong backend lifespan, không tách service)
 * **DB:** PostgreSQL 15-alpine
+* **Monitoring:** Prometheus + Grafana (auto-provisioned dashboard, `prometheus-fastapi-instrumentator`)
 * **Deploy:** Docker Compose → AWS EC2 t3.micro + RDS free tier
 
 ## Key decisions
 
-**XGBoost thay vì DL:** tabular + imbalance → boosting thắng. Train CPU 5-10 phút trên laptop FX506HC. Model ~10MB, inference <10ms.
+**Multi-model (XGBoost + LightGBM + RandomForest):** tabular + imbalance → boosting/ensemble. Retrain train cả 3 tuần tự → promote model có AUROC cao nhất. XGBoost/LightGBM handle NaN native, RandomForest wrap trong `Pipeline(SimpleImputer + RFC)`. Model load qua `mlflow.pyfunc` (model-agnostic). Train CPU 5-10 phút/model trên laptop FX506HC.
 
 **Train trên laptop, không cần Kaggle:** Laptop ASUS TUF FX506HC (RTX 3050 4GB, 24GB RAM) dư sức cho XGBoost CPU 5-10 phút. Kaggle (P100/T4x2) chỉ cần khi muốn thử LSTM/Transformer làm baseline so sánh trong báo cáo (optional). Lý do chọn laptop: (1) tiện retrain auto qua APScheduler local, (2) không phụ thuộc Kaggle session timeout, (3) cùng môi trường venv với code production.
 
@@ -127,13 +147,17 @@ Project/                          # = project root (cwd)
 
 **MLflow alias thay vì stage:** MLflow 2.9+ đã deprecate Stage (None/Staging/Production/Archived) — sẽ remove ở 3.x. Dùng alias `production` (URI `models:/sepsis-predictor@production`). Lợi thế: nhiều alias trên 1 version (canary/champion/challenger), pointer riêng không phá history.
 
+**Data validation trước retrain:** Consumer validate vital signs theo clinical range (HR 20-300, Temp 25-45, ...) → lưu `is_validated` flag vào DB. Data vẫn lưu DB (monitoring) + vẫn predict real-time, nhưng retrain chỉ pull rows `is_validated=TRUE`. Ngăn data nhiễu/outlier ảnh hưởng model quality.
+
+**Scheduler toggle:** `ENABLE_SCHEDULER=false` env var tắt APScheduler → retrain chỉ qua manual API. Hữu ích khi debug trên AWS hoặc muốn kiểm soát retrain thủ công.
+
 ## ML workflow
 
 ```
 ml/
 ├── src/                          # Logic chính - import được từ cả notebook + scheduler
 │   ├── preprocess.py             # load_psv_files(), feature_engineering(), split_train_val()
-│   ├── train.py                  # train_model(train_df, val_df, params) -> (model, metrics)
+│   ├── train.py                  # train_model(train_df, val_df, model_type) -> (model, metrics)
 │   ├── evaluate.py               # compute_metrics() - AUROC, AUPRC, Utility score
 │   ├── drift_detect.py           # Evidently report, CLI: --mode daily
 │   └── retrain.py                # CLI orchestrator, gọi từ APScheduler
@@ -148,24 +172,17 @@ ml/
 **Ví dụ:**
 
 ```python
-# ml/src/train.py
-def train_model(train_df, val_df, params: dict) -> tuple[xgb.Booster, dict]:
-    """Train XGBoost + log MLflow. Return (model, metrics)."""
-    ...
+# ml/src/train.py — hỗ trợ 3 model types
+from ml.src.train import ModelType, train_model
 
-if __name__ == "__main__":  # Cho phép: python ml/src/train.py
-    train_df, val_df = load_and_split()
-    train_model(train_df, val_df, DEFAULT_PARAMS)
-```
+model, metrics = train_model(train_df, val_df, model_type=ModelType.XGBOOST)
+model, metrics = train_model(train_df, val_df, model_type=ModelType.LIGHTGBM)
+model, metrics = train_model(train_df, val_df, model_type=ModelType.RANDOM_FOREST)
 
-```python
-# ml/notebooks/02_train_baseline.ipynb
-from ml.src.train import train_model
-from ml.src.preprocess import load_and_split
-
-train_df, val_df = load_and_split()
-model, metrics = train_model(train_df, val_df, my_params)
-# Plot results, thử params khác...
+# CLI:
+# python -m ml.src.train --model-type xgboost --register
+# python -m ml.src.train --model-type lightgbm --register
+# python -m ml.src.train --model-type random_forest --register
 ```
 
 ## Online retrain workflow (yêu cầu giảng viên)
@@ -173,10 +190,13 @@ model, metrics = train_model(train_df, val_df, my_params)
 Đề bài yêu cầu "data online để train lại model". Cách triển khai:
 
 ```
-Producer giả lập "data online" → Kafka → Backend consumer → Lưu vital + sepsis_label vào Postgres
+Producer giả lập "data online" → Kafka → Backend consumer
+                                              ├─ Validate vitals (clinical range)
+                                              ├─ Predict (pyfunc model-agnostic)
+                                              └─ Lưu vital + is_validated flag vào Postgres
                                                                     │
                                                                     ▼
-                                            Sau N giờ stream, DB có data mới
+                                            Sau N giờ stream, DB có data mới (validated + invalid)
                                                                     │
                        ┌────────────────────────────────────────────┤
                        ▼                                            ▼
@@ -188,12 +208,35 @@ Producer giả lập "data online" → Kafka → Backend consumer → Lưu vital
                        └────────────────┬───────────────────────────┘
                                         ▼
                             retrain.py:
-                            1. Pull data mới từ Postgres + data gốc
-                            2. Train XGBoost với MLflow tracking
-                            3. So sánh AUROC mới vs production hiện tại
-                            4. AUROC mới tốt hơn → set alias `production` trỏ version mới
+                            1. Pull data mới từ Postgres (CHỈ is_validated=TRUE) + data gốc
+                            2. Train 3 model: XGBoost + LightGBM + RandomForest (tuần tự)
+                            3. So sánh AUROC cả 3 → chọn best
+                            4. Best AUROC > production → set alias `production` trỏ version mới
                             5. Scheduler gọi loader.reload_model() → backend swap cache (không cần restart)
 ```
+
+## Data validation & retrain safeguards
+
+```
+Kafka message → validate_vitals() → is_validated flag
+                    │                      │
+                    ├─ HR: 20-300          ├─ TRUE → retrain sẽ dùng row này
+                    ├─ O2Sat: 0-100       └─ FALSE → lưu DB (monitoring) nhưng retrain bỏ qua
+                    ├─ Temp: 25-45
+                    ├─ SBP: 30-300        NaN/None → pass (PhysioNet có missing data)
+                    ├─ MAP: 20-250        Giá trị ngoài range → fail → is_validated=FALSE
+                    ├─ DBP: 10-200
+                    ├─ Resp: 2-60
+                    └─ EtCO2: 0-100
+```
+
+**Retrain safeguards:**
+1. **Data validation gate:** chỉ `is_validated=TRUE` rows vào retrain.
+2. **AUROC promotion guard:** model mới phải `auroc > production_auroc` mới promote.
+3. **Multi-model comparison:** train 3 model types → chọn best AUROC → so với production.
+4. **Early stopping:** XGBoost/LightGBM dừng sau 30 rounds val AUC không cải thiện.
+5. **Baseline dilution:** retrain concat baseline 40k patients + DB data → data nhiễu bị pha loãng.
+6. **Scheduler toggle:** `ENABLE_SCHEDULER=false` để tắt auto-retrain khi cần kiểm soát thủ công.
 
 **Khi nào retrain:**
 
@@ -227,13 +270,14 @@ alembic upgrade head
 # 6. Start MLflow tracking server (terminal riêng, giữ chạy)
 mlflow ui --backend-store-uri ml/notebooks/mlruns --port 5000
 
-# 7. Train baseline + register vào MLflow
-#    - Cách A: chạy notebook ml/notebooks/02_train_baseline.ipynb,
-#              uncomment cell cuối với register_model=True.
-#    - Cách B: headless:
-python -m ml.src.train --register
+# 7. Train baseline + register vào MLflow (3 model types)
+#    - Cách A: chạy notebook ml/notebooks/02_train_baseline.ipynb
+#    - Cách B: headless (train từng model type):
+python -m ml.src.train --model-type xgboost --register
+python -m ml.src.train --model-type lightgbm --register
+python -m ml.src.train --model-type random_forest --register
 
-#    Mở http://localhost:5000 → Models → sepsis-predictor → Version 1 →
+#    Mở http://localhost:5000 → Models → sepsis-predictor → chọn version tốt nhất →
 #    bấm "Add alias" → đặt alias = `production` (lowercase).
 
 # 8. Start backend (terminal riêng)
@@ -264,7 +308,7 @@ python -m streaming.dev_predict_smoke --patient p000009 --hours 60
 | **T4** | ✅ Done         | Kafka KRaft local, producer interleave + rate, consumer thread, save DB, WebSocket broadcast                                |
 | **T5** | ✅ Done         | React + Vite + Tailwind. Dashboard (list/alerts/stats), PatientDetail (vital + risk charts), ModelInfo, DriftReports        |
 | **T6** | ✅ Done         | Evidently drift detect, retrain orchestrator, APScheduler jobs daily/weekly, manual trigger endpoints, 9 pytest, smoke test full chain |
-| **T7** | 🚧 2/3 phase   | ✅ Dockerize (3 Dockerfile + compose.prod) · ✅ CI (lint/test/frontend/build-push GHCR) · ⬜ AWS deploy                       |
+| **T7** | 🚧 2/3 phase   | ✅ Dockerize (3 Dockerfile + compose.prod) · ✅ CI (lint/test/frontend/build-push GHCR) · 🚧 AWS deploy (code prep done, S3 upload training_setA in progress) |
 | **CN** | ⬜ Todo         | Polish UI, viết báo cáo, record demo video                                                                                  |
 
 ## Database schema
@@ -272,11 +316,14 @@ python -m streaming.dev_predict_smoke --patient p000009 --hours 60
 ```
 patient(id, age, gender, unit1, unit2, hosp_adm_time, created_at)
 vital(id, patient_id FK, hour, hr, o2sat, temp, sbp, map, dbp, resp, etco2,
-      lab_values JSONB, sepsis_label, created_at)
+      lab_values JSONB, sepsis_label, is_validated BOOL DEFAULT TRUE, created_at)
   UNIQUE(patient_id, hour), INDEX(patient_id, hour)
+  -- is_validated: FALSE nếu vital ngoài clinical range → retrain filter bỏ
 prediction(id, patient_id FK, hour, sepsis_risk, model_version, predicted_at)
   UNIQUE(patient_id, hour), INDEX(patient_id, hour)
-model_version(version PK, mlflow_run_id, auroc, auprc, utility, threshold, status, created_at)
+model_version(version PK, mlflow_run_id, auroc, auprc, utility, threshold,
+              model_type VARCHAR(20), status, created_at)
+  -- model_type ∈ {xgboost, lightgbm, random_forest}
   -- status ∈ {production, staging, archived} — mirror MLflow alias
 drift_report(id, ref_period_start/end, target_period_start/end,
              drift_share, triggered_retrain, report_json JSONB, created_at)
@@ -358,7 +405,6 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
 ## DO NOT
 
 * ❌ Airflow/Kubeflow (over-engineer)
-* ❌ Deep learning (XGBoost đủ và tốt hơn)
 * ❌ Hardcode paths/credentials → dùng `.env`
 * ❌ Commit `data/`, `mlruns/`, `venv/`, `.env`, `*.pkl`
 * ❌ Sync SQLAlchemy trong async endpoint
@@ -366,4 +412,7 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
 * ❌ Commit notebook có output nặng → `jupyter nbconvert --clear-output` trước khi commit
 * ❌ Dùng MLflow Stage (deprecated) → dùng **alias** `production`
 * ❌ Load XGBoost model trong request handler (chậm 200-500ms) → cache in-memory ở `loader.py`
-* ❌ Block FastAPI event loop với ML heavy work (drift/train) → scheduler dùng `asyncio.create_subprocess_exec` chạy `python -m ml.src.<job>`
+* ❌ Block FastAPI event loop với ML heavy work (drift/train) → scheduler dùng `asyncio.to_thread(subprocess.run)` chạy `python -m ml.src.<job>`
+* ❌ Deep learning (boosting/ensemble đủ và tốt hơn cho tabular data)
+* ❌ Load model bằng `mlflow.xgboost.load_model()` → dùng `mlflow.pyfunc.load_model()` (model-agnostic)
+* ❌ Đưa data chưa validate vào retrain → consumer validate + mark `is_validated`, retrain filter `WHERE is_validated=TRUE`

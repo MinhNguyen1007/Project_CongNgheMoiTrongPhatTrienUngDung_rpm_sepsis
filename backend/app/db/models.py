@@ -71,6 +71,7 @@ class Vital(Base):
     lab_values: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     sepsis_label: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_validated: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     patient: Mapped[Patient] = relationship(back_populates="vitals")
@@ -119,6 +120,7 @@ class ModelVersion(Base):
     auprc: Mapped[float | None] = mapped_column(Float, nullable=True)
     utility: Mapped[float | None] = mapped_column(Float, nullable=True)
     threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
+    model_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
     # status: 'production' | 'staging' | 'archived' (mirror MLflow alias)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="staging")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

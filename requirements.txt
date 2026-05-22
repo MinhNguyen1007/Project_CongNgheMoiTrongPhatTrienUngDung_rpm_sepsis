@@ -8,11 +8,15 @@ numpy>=1.26,<2.0
 pandas>=2.2,<3.0
 scikit-learn>=1.4,<2.0
 xgboost>=2.0,<3.0
+lightgbm>=4.0,<5.0
 scipy>=1.12
 
 # --- Experiment tracking + drift ---
 mlflow>=2.11,<3.0
 evidently>=0.4.25,<0.5
+
+# --- Monitoring ---
+prometheus-fastapi-instrumentator>=7.0,<8.0
 
 # --- Backend (FastAPI + async stack) ---
 fastapi>=0.110,<0.120

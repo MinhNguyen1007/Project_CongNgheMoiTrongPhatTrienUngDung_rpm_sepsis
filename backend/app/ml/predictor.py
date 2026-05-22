@@ -1,11 +1,16 @@
-"""Predict 1 row → sepsis risk. Stateless wrapper quanh model + buffer."""
+"""Predict 1 row → sepsis risk. Stateless wrapper quanh model + buffer.
+
+WHY pyfunc + DataFrame: model-agnostic — XGBoost, LightGBM, RandomForest
+đều nhận pd.DataFrame input qua mlflow.pyfunc interface.
+"""
 
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
 
-import xgboost as xgb
+import numpy as np
+import pandas as pd
 
 from backend.app.ml.features import (
     PatientBuffer,
@@ -50,18 +55,15 @@ def predict_one(
     """
     model = get_model()
 
-    # Append row vào buffer TRƯỚC khi compute features — để rolling tính kể cả
-    # giờ hiện tại trong window 6h (giống preprocess offline).
     state = _buffer.update(patient_id, row)
 
     features = compute_features(state, current_row=row, demographics=demographics)
     x = features_to_array(features, model.feature_names)
 
-    # XGBoost predict: cần DMatrix với feature_names match. reshape(1, -1) → 1 row.
-    dmat = xgb.DMatrix(x.reshape(1, -1), feature_names=model.feature_names)
-    risk = float(model.booster.predict(dmat)[0])
+    input_df = pd.DataFrame(x.reshape(1, -1), columns=model.feature_names)
+    prediction = model.model.predict(input_df)
+    risk = float(prediction[0]) if isinstance(prediction, np.ndarray) else float(prediction)
 
-    # Clip [0, 1] phòng numerical issue (logistic output thường an toàn).
     risk = max(0.0, min(1.0, risk))
 
     return PredictionResult(
