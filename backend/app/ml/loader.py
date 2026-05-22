@@ -87,5 +87,7 @@ def reload_model() -> LoadedModel:
         new_model = _load_from_registry()
         old_version = _model.version if _model else "None"
         _model = new_model
-        logger.info("Model reloaded: %s → %s (%s)", old_version, new_model.version, new_model.model_type)
+        logger.info(
+            "Model reloaded: %s → %s (%s)", old_version, new_model.version, new_model.model_type
+        )
         return new_model

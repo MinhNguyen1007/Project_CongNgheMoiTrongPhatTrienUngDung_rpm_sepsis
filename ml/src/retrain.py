@@ -221,12 +221,18 @@ async def run(reason: str, hours_from_db: int, max_patients: int | None) -> dict
         promoted = True
         logger.info(
             "Promoted %s version=%s (auroc %.4f > prod %.4f)",
-            best_type.value, new_version_num, best_auroc, production_auroc or 0,
+            best_type.value,
+            new_version_num,
+            best_auroc,
+            production_auroc or 0,
         )
     else:
         logger.info(
             "Best model %s version=%s NOT promoted (auroc %.4f <= prod %.4f)",
-            best_type.value, new_version_num, best_auroc, production_auroc,
+            best_type.value,
+            new_version_num,
+            best_auroc,
+            production_auroc,
         )
 
     del train_df, val_df, feats, combined, base_df, db_df
@@ -287,7 +293,9 @@ def main() -> None:
     print(json.dumps(result, default=str))
     logger.info(
         "Done. best=%s promoted=%s auroc=%.4f",
-        result["best_model_type"], result["promoted"], result["new_auroc"],
+        result["best_model_type"],
+        result["promoted"],
+        result["new_auroc"],
     )
 
 

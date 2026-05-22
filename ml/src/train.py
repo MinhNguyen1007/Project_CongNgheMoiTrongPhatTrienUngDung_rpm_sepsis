@@ -177,10 +177,12 @@ def _train_random_forest(
 
     p = {**params, "class_weight": {0: 1.0, 1: scale_pos_weight}}
 
-    pipeline = Pipeline([
-        ("imputer", SimpleImputer(strategy="median")),
-        ("clf", RandomForestClassifier(**p)),
-    ])
+    pipeline = Pipeline(
+        [
+            ("imputer", SimpleImputer(strategy="median")),
+            ("clf", RandomForestClassifier(**p)),
+        ]
+    )
     pipeline.fit(X_train, y_train)
     y_score = pipeline.predict_proba(X_val)[:, 1]
     return pipeline, y_score
@@ -233,21 +235,35 @@ def train_model(
             p = {**XGBOOST_PARAMS, **(params or {})}
             mlflow.log_params({k: v for k, v in p.items() if not isinstance(v, list)})
             model, y_score = _train_xgboost(
-                train_df, val_df, feature_cols, p,
-                num_boost_round, early_stopping_rounds, spw,
+                train_df,
+                val_df,
+                feature_cols,
+                p,
+                num_boost_round,
+                early_stopping_rounds,
+                spw,
             )
         elif model_type == ModelType.LIGHTGBM:
             p = {**LIGHTGBM_PARAMS, **(params or {})}
             mlflow.log_params({k: v for k, v in p.items() if not isinstance(v, list)})
             model, y_score = _train_lightgbm(
-                train_df, val_df, feature_cols, p,
-                num_boost_round, early_stopping_rounds, spw,
+                train_df,
+                val_df,
+                feature_cols,
+                p,
+                num_boost_round,
+                early_stopping_rounds,
+                spw,
             )
         elif model_type == ModelType.RANDOM_FOREST:
             p = {**RF_PARAMS, **(params or {})}
             mlflow.log_params(p)
             model, y_score = _train_random_forest(
-                train_df, val_df, feature_cols, p, spw,
+                train_df,
+                val_df,
+                feature_cols,
+                p,
+                spw,
             )
         else:
             raise ValueError(f"Unknown model_type: {model_type}")
@@ -263,13 +279,15 @@ def train_model(
 
         if model_type == ModelType.XGBOOST:
             mlflow.xgboost.log_model(
-                model, artifact_path="model",
+                model,
+                artifact_path="model",
                 registered_model_name=registered_name,
                 signature=signature,
             )
         elif model_type == ModelType.LIGHTGBM:
             mlflow.lightgbm.log_model(
-                model, artifact_path="model",
+                model,
+                artifact_path="model",
                 registered_model_name=registered_name,
                 signature=signature,
             )
@@ -283,7 +301,9 @@ def train_model(
 
         logger.info(
             "MLflow run_id=%s, model_type=%s, metrics=%s",
-            run.info.run_id, model_type.value, metrics,
+            run.info.run_id,
+            model_type.value,
+            metrics,
         )
 
     return model, metrics
