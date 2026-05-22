@@ -48,14 +48,18 @@ def _load_from_registry() -> LoadedModel:
 
     model = mlflow.pyfunc.load_model(model_uri)
 
-    # Feature names từ signature (bắt buộc log signature khi train).
     sig = model.metadata.signature
     if sig and sig.inputs:
         feature_names = [inp.name for inp in sig.inputs.inputs]
     else:
-        raise RuntimeError(
-            "Model has no input signature — cannot determine feature names. "
-            "Re-train with signature=infer_signature(...)."
+        # WHY fallback: model cũ (v1) trained trước khi thêm infer_signature().
+        from backend.app.ml.features import _PatientState, compute_features
+
+        dummy = compute_features(_PatientState(), {}, {})
+        feature_names = list(dummy.keys())
+        logger.warning(
+            "Model has no signature — falling back to features.compute_features keys (%d features)",
+            len(feature_names),
         )
 
     # Model type từ MLflow run tag.
