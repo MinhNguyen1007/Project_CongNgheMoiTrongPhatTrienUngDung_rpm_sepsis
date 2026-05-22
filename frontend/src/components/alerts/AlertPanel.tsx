@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 
 import { Loading } from "@/components/common/Loading";
+import { AlertIcon } from "@/components/common/Icons";
 import { RiskBadge } from "@/components/common/RiskBadge";
 import { useAlerts } from "@/hooks/useAlerts";
 import { useAlertsContext } from "@/context/AlertsContext";
@@ -20,7 +21,7 @@ export function AlertPanel() {
     <section className="bg-white rounded-lg border border-slate-200 overflow-hidden">
       <header className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-red-50">
         <div className="flex items-center gap-2">
-          <span className="text-red-600">🚨</span>
+          <AlertIcon className="w-5 h-5 text-red-600" />
           <h3 className="font-semibold text-slate-800">High-Risk Alerts</h3>
           {(serverAlerts?.length ?? 0) > 0 && (
             <span className="bg-red-600 text-white text-xs font-bold rounded-full px-2 py-0.5">

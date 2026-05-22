@@ -20,10 +20,20 @@ export default function DriftReports() {
       </div>
 
       {!data || data.length === 0 ? (
-        <EmptyState
-          title="No drift reports yet"
-          description="Drift detection job (T6) chưa chạy. Sau khi enable APScheduler, daily 2AM sẽ tạo report."
-        />
+        <div className="space-y-4">
+          <EmptyState
+            title="No drift reports yet"
+            description="Drift detection runs daily at 2AM UTC. Reports appear here after the first scheduled check, or trigger manually via POST /api/drift/check."
+          />
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
+            <p className="font-semibold mb-1">How drift detection works</p>
+            <ul className="list-disc list-inside space-y-0.5 text-blue-700">
+              <li>Evidently compares reference data (training set) vs. recent 24h vitals from DB</li>
+              <li>If &gt;30% of features drift significantly → triggers automatic retrain</li>
+              <li>Each check produces a report with drift share and retrain status</li>
+            </ul>
+          </div>
+        </div>
       ) : (
         <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
           <table className="w-full text-sm tabular">

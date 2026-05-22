@@ -41,7 +41,7 @@ export function StatsCards() {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
       <Card label="Active patients (24h)" value={total} accent="blue" />
-      <Card label="High risk" value={highRisk} accent="red" hint={`Risk ≥ ${modelInfo?.threshold.toFixed(2) ?? "0.70"}`} />
+      <Card label="High risk" value={highRisk} accent="red" hint={`Risk ≥ ${modelInfo?.threshold?.toFixed(2) ?? "0.70"}`} />
       <Card label="Medium risk" value={mediumRisk} accent="slate" hint="0.30 ≤ Risk < 0.70" />
       <Card label="Active alerts" value={alertCount} accent="red" hint="From /alerts endpoint" />
     </div>

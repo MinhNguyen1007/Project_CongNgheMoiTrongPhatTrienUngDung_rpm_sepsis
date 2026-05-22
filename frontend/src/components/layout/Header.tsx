@@ -1,5 +1,6 @@
 import { useModelCurrentInfo } from "@/hooks/useModelInfo";
 import { useWebSocketStatus } from "@/context/WebSocketContext";
+import { MenuIcon } from "@/components/common/Icons";
 
 const STATUS_STYLES = {
   open: "bg-green-100 text-green-700 ring-green-300",
@@ -13,13 +14,24 @@ const STATUS_LABELS = {
   closed: "Disconnected",
 } as const;
 
-export function Header() {
+interface HeaderProps {
+  onMenuClick: () => void;
+}
+
+export function Header({ onMenuClick }: HeaderProps) {
   const wsStatus = useWebSocketStatus();
   const { data: modelInfo } = useModelCurrentInfo();
 
   return (
-    <header className="h-14 bg-white border-b border-slate-200 px-6 flex items-center justify-between">
-      <div>
+    <header className="h-14 bg-white border-b border-slate-200 px-4 lg:px-6 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onMenuClick}
+          className="lg:hidden p-1.5 rounded-md text-slate-600 hover:bg-slate-100"
+        >
+          <MenuIcon className="w-5 h-5" />
+        </button>
         <h2 className="font-semibold text-slate-800">ICU Sepsis Monitoring</h2>
       </div>
       <div className="flex items-center gap-3 text-sm">
