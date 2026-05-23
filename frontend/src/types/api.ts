@@ -21,6 +21,7 @@ export interface VitalRecord {
   etco2: number | null;
   lab_values: Record<string, number | null> | null;
   sepsis_label: number | null;
+  is_validated: boolean;
   created_at: string;
 }
 
@@ -45,6 +46,7 @@ export interface ModelInfo {
   auprc: number | null;
   utility: number | null;
   threshold: number | null;
+  model_type: string | null;
   status: string;
   created_at: string;
 }

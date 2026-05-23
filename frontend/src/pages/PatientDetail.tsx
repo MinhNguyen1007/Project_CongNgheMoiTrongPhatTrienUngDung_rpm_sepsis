@@ -104,6 +104,7 @@ export default function PatientDetail() {
                 <th className="px-3 py-2 font-medium">MAP</th>
                 <th className="px-3 py-2 font-medium">Resp</th>
                 <th className="px-3 py-2 font-medium">Sepsis label</th>
+                <th className="px-3 py-2 font-medium">Validated</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -123,6 +124,17 @@ export default function PatientDetail() {
                       </span>
                     ) : (
                       <span className="text-slate-400">—</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    {v.is_validated ? (
+                      <span className="inline-block px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-semibold">
+                        Valid
+                      </span>
+                    ) : (
+                      <span className="inline-block px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-semibold">
+                        Invalid
+                      </span>
                     )}
                   </td>
                 </tr>
