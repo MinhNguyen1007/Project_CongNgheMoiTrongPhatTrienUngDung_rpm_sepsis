@@ -113,6 +113,7 @@ async def upsert_prediction(
         set_={
             "sepsis_risk": stmt.excluded.sepsis_risk,
             "model_version": stmt.excluded.model_version,
+            "predicted_at": func.now(),
         },
     )
     await session.execute(stmt)
