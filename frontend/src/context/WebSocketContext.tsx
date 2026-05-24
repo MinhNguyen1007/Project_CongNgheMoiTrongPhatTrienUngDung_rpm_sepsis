@@ -6,7 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useAlertsContext } from "@/context/AlertsContext";
-import type { WSPredictionEvent } from "@/types/api";
+import type { PatientSummary, WSPredictionEvent } from "@/types/api";
 
 type Status = "connecting" | "open" | "closed";
 
@@ -30,15 +30,34 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const { status } = useWebSocket<WSPredictionEvent>({
     url: resolveWsUrl(import.meta.env.VITE_WS_URL),
     onMessage: (event) => {
-      // WHY invalidate: list patient + alerts dùng React Query cache. Khi có
-      // prediction mới, invalidate để hook refetch. Throttle ko cần vì backend
-      // gửi ~1 msg/giây, refetch debounced bởi staleTime 10s.
-      queryClient.invalidateQueries({ queryKey: ["patients"] });
+      // WHY setQueriesData thay vì invalidateQueries cho patients: update cache
+      // trực tiếp = instant render, không cần HTTP round-trip (~300-500ms) mỗi event.
+      // Nếu patient chưa có trong list (mới) → fallback invalidate để fetch về.
+      let patientFound = false;
+      queryClient.setQueriesData<PatientSummary[]>(
+        { queryKey: ["patients"] },
+        (old) => {
+          if (!old) return old;
+          const idx = old.findIndex((p) => p.id === event.patient_id);
+          if (idx === -1) return old;
+          patientFound = true;
+          const updated = [...old];
+          updated[idx] = {
+            ...updated[idx],
+            current_risk: event.sepsis_risk,
+            last_updated: event.predicted_at,
+          };
+          return updated;
+        },
+      );
+      if (!patientFound) {
+        queryClient.invalidateQueries({ queryKey: ["patients"] });
+      }
+
       queryClient.invalidateQueries({ queryKey: ["alerts"] });
       queryClient.invalidateQueries({ queryKey: ["patient-predictions", event.patient_id] });
       queryClient.invalidateQueries({ queryKey: ["patient-vitals", event.patient_id] });
 
-      // Push alert vào global state nếu event.alert=true.
       push(event);
     },
   });
